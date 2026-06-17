@@ -1,0 +1,220 @@
+{
+  "subjects": [
+    {
+      "id": "maths",
+      "name": "Mathematics",
+      "color": "#2563eb",
+      "topics": [
+        "Pure Mathematics",
+        "Statistics",
+        "Mechanics"
+      ],
+      "allowedEmails": [
+        "mrimmoaee@gmail.com"
+      ],
+      "units": []
+    },
+    {
+      "id": "physics",
+      "name": "Physics IGCSE",
+      "color": "#059669",
+      "topics": [
+        "Unit 1: Forces and Motion",
+        "Forces and Motion",
+        "Electricity",
+        "Waves",
+        "Energy Resources and Transfers",
+        "Solids, Liquids and Gases",
+        "Magnetism and Electromagnetism",
+        "Radioactivity and Particles",
+        "Astrophysics"
+      ],
+      "allowedEmails": [],
+      "units": []
+    },
+    {
+      "id": "edexcel-ial-physics",
+      "name": "Edexcel IAL Physics",
+      "color": "#7c3aed",
+      "topics": [
+        "AS - Unit 1",
+        "AS - Unit 2",
+        "AS - Unit 3",
+        "A2 - Unit 4",
+        "A2 - Unit 5",
+        "A2 - Unit 6",
+        "Motion",
+        "Forces & Momentum",
+        "Moments",
+        "Work, Energy & Power",
+        "Density, Upthrust & Viscous Drag",
+        "Stretching Materials"
+      ],
+      "allowedEmails": [],
+      "units": [
+        {
+          "id": "ial-physics-unit-1",
+          "title": "1. Mechanics & Materials",
+          "topicCount": 6,
+          "revisionNoteCount": 32,
+          "topics": [
+            "Motion",
+            "Forces & Momentum",
+            "Moments",
+            "Work, Energy & Power",
+            "Density, Upthrust & Viscous Drag",
+            "Stretching Materials"
+          ],
+          "topicItems": [
+            {
+              "id": "ial-physics-unit-1-motion",
+              "title": "Motion",
+              "subtopics": []
+            },
+            {
+              "id": "ial-physics-unit-1-forces-momentum",
+              "title": "Forces & Momentum",
+              "subtopics": []
+            },
+            {
+              "id": "ial-physics-unit-1-moments",
+              "title": "Moments",
+              "subtopics": []
+            },
+            {
+              "id": "ial-physics-unit-1-work-energy-power",
+              "title": "Work, Energy & Power",
+              "subtopics": []
+            },
+            {
+              "id": "ial-physics-unit-1-density-upthrust-viscous-drag",
+              "title": "Density, Upthrust & Viscous Drag",
+              "subtopics": []
+            },
+            {
+              "id": "ial-physics-unit-1-stretching-materials",
+              "title": "Stretching Materials",
+              "subtopics": []
+            }
+          ],
+          "allowedEmails": []
+        },
+        {
+          "id": "ial-physics-unit-2",
+          "title": "2. Waves & Electricity",
+          "topicCount": 8,
+          "revisionNoteCount": 51,
+          "topics": [],
+          "topicItems": [],
+          "allowedEmails": []
+        },
+        {
+          "id": "ial-physics-unit-3",
+          "title": "3. Practical Skills in Physics I",
+          "topicCount": 3,
+          "revisionNoteCount": 25,
+          "topics": [],
+          "topicItems": [],
+          "allowedEmails": []
+        },
+        {
+          "id": "ial-physics-unit-4",
+          "title": "4. Further Mechanics, Fields & Particles",
+          "topicCount": 7,
+          "revisionNoteCount": 44,
+          "topics": [],
+          "topicItems": [],
+          "allowedEmails": []
+        },
+        {
+          "id": "ial-physics-unit-5",
+          "title": "5. Thermodynamics, Radiation, Oscillations & Cosmology",
+          "topicCount": 10,
+          "revisionNoteCount": 47,
+          "topics": [],
+          "topicItems": [],
+          "allowedEmails": []
+        },
+        {
+          "id": "ial-physics-unit-6",
+          "title": "6. Practical Skills in Physics II",
+          "topicCount": 3,
+          "revisionNoteCount": 23,
+          "topics": [],
+          "topicItems": [],
+          "allowedEmails": []
+        }
+      ]
+    },
+    {
+      "id": "it",
+      "name": "IT",
+      "color": "#dc2626",
+      "topics": [
+        "Unit 1: Digital Devices",
+        "Unit 2: Connectivity",
+        "Unit 3: Software and Data",
+        "Topic 1 : Hardware & Software",
+        "Topic 2 : Network"
+      ],
+      "allowedEmails": [
+        "mrimmoaee@gmail.com"
+      ],
+      "units": [
+        {
+          "id": "it-as-unit-1-1781727478033",
+          "title": "AS - Unit 1",
+          "topicCount": 2,
+          "revisionNoteCount": 0,
+          "topics": [
+            "Topic 1 : Hardware & Software",
+            "Topic 2 : Network"
+          ],
+          "topicItems": [
+            {
+              "id": "it-as-unit-1-1781727478033-topic-1-hardware-software",
+              "title": "Topic 1 : Hardware & Software",
+              "subtopics": [
+                {
+                  "id": "it-as-unit-1-1781727478033-topic-1-hardware-software-hardware-1781727773571",
+                  "title": "Hardware 2",
+                  "driveUrl": "https://drive.google.com/file/d/1RiP73dNNl2Q-1j-_ABbx8hUgy5FDEuOt/view"
+                },
+                {
+                  "id": "it-as-unit-1-1781727478033-topic-1-hardware-software-software-1781727806401",
+                  "title": "Software",
+                  "driveUrl": "https://drive.google.com/file/d/1iv-LIbdHnTqV3AjO7UkxVnvxBiap0e19/view?usp=sharing"
+                }
+              ]
+            },
+            {
+              "id": "it-as-unit-1-1781727478033-topic-2-network",
+              "title": "Topic 2 : Network",
+              "subtopics": []
+            }
+          ],
+          "allowedEmails": [
+            "mrimmoaee@gmail.com"
+          ]
+        },
+        {
+          "id": "it-as-unit-2-1781727533350",
+          "title": "AS - Unit 2",
+          "topicCount": 0,
+          "revisionNoteCount": 0,
+          "topics": [],
+          "topicItems": [],
+          "allowedEmails": []
+        }
+      ]
+    },
+    {
+      "id": "chemistry",
+      "name": "Chemistry",
+      "color": "#d97706",
+      "topics": [],
+      "allowedEmails": [],
+      "units": []
+    }
+  ]
+}
