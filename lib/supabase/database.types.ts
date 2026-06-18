@@ -174,6 +174,30 @@ export type Database = {
         };
         Relationships: [];
       };
+      app_user_roles: {
+        Row: {
+          email: string;
+          role: "admin" | "student";
+          full_name: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          email: string;
+          role: "admin" | "student";
+          full_name?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          email?: string;
+          role?: "admin" | "student";
+          full_name?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
