@@ -914,6 +914,40 @@ h2 {
   text-align: left;
 }
 
+.admin-subject-row {
+  align-items: center;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) 34px;
+}
+
+.admin-subject-row .admin-subject-button {
+  min-width: 0;
+}
+
+.admin-subject-delete {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #94a3b8;
+  display: inline-flex;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.admin-subject-delete:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.32);
+  color: #fecaca;
+}
+
+.admin-subject-delete:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .admin-subject-button:hover,
 .admin-subject-button.active {
   background: rgba(255, 255, 255, 0.1);
@@ -1298,6 +1332,11 @@ h2 {
 .admin-subtopic-row button {
   background: rgba(37, 99, 235, 0.12);
   color: var(--brand-dark);
+}
+
+.admin-subtopic-row button.danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
 }
 
 .admin-subtopic-edit-form {

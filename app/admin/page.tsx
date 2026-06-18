@@ -36,6 +36,7 @@ export default function AdminPage() {
   const [unitEmailDrafts, setUnitEmailDrafts] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     if (window.localStorage.getItem("edexcel-auth-role") !== "admin") {
@@ -51,13 +52,30 @@ export default function AdminPage() {
     [selectedSubjectId, subjects]
   );
 
-  async function loadSubjects() {
-    setIsLoading(true);
-    const response = await fetch("/api/admin/subjects", { cache: "no-store" });
-    const data = (await response.json()) as { subjects: Subject[] };
+  async function loadSubjects(showLoading = true, preferredSubjectId?: string) {
+    if (showLoading) setIsLoading(true);
+    setLoadError("");
+
+    try {
+      const data = await readSubjectsResponse(await fetch("/api/admin/subjects", { cache: "no-store" }));
+      setSubjects(data.subjects);
+      setSelectedSubjectId((current) => preferredSubjectId || current || data.subjects[0]?.id || "");
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Unable to load subjects.");
+      setSubjects([]);
+    } finally {
+      if (showLoading) setIsLoading(false);
+    }
+  }
+
+  function applySubjects(data: { subjects: Subject[] }, preferredSubjectId?: string) {
     setSubjects(data.subjects);
-    setSelectedSubjectId((current) => current || data.subjects[0]?.id || "");
-    setIsLoading(false);
+    setSelectedSubjectId((current) => {
+      const nextSubjectId = preferredSubjectId ?? current;
+      if (nextSubjectId && data.subjects.some((subject) => subject.id === nextSubjectId)) return nextSubjectId;
+
+      return data.subjects[0]?.id ?? "";
+    });
   }
 
   async function handleAddEmail(event: FormEvent<HTMLFormElement>) {
@@ -70,8 +88,7 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email })
     });
-    const data = (await response.json()) as { subjects: Subject[] };
-    setSubjects(data.subjects);
+    applySubjects(await readSubjectsResponse(response), selectedSubject.id);
     setEmail("");
     setIsSaving(false);
   }
@@ -86,9 +103,9 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: subjectName })
     });
-    const data = (await response.json()) as { subjects: Subject[] };
-    setSubjects(data.subjects);
-    setSelectedSubjectId(data.subjects.at(-1)?.id ?? selectedSubjectId);
+    const data = await readSubjectsResponse(response);
+    const newSubjectId = slugify(subjectName);
+    applySubjects(data, data.subjects.some((subject) => subject.id === newSubjectId) ? newSubjectId : selectedSubjectId);
     setSubjectName("");
     setIsSaving(false);
   }
@@ -103,8 +120,7 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: unitTitle })
     });
-    const data = (await response.json()) as { subjects: Subject[] };
-    setSubjects(data.subjects);
+    applySubjects(await readSubjectsResponse(response), selectedSubject.id);
     setUnitTitle("");
     setIsSaving(false);
   }
@@ -119,8 +135,7 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ topic: topicDrafts[unitId] })
     });
-    const data = (await response.json()) as { subjects: Subject[] };
-    setSubjects(data.subjects);
+    applySubjects(await readSubjectsResponse(response), selectedSubject.id);
     setTopicDrafts((current) => ({ ...current, [unitId]: "" }));
     setIsSaving(false);
   }
@@ -136,8 +151,7 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title })
     });
-    const data = (await response.json()) as { subjects: Subject[] };
-    setSubjects(data.subjects);
+    applySubjects(await readSubjectsResponse(response), selectedSubject.id);
     setEditingTopicId("");
     setTopicEditDrafts((current) => ({ ...current, [topicId]: "" }));
     setIsSaving(false);
@@ -153,8 +167,7 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: unitEmailDrafts[unitId] })
     });
-    const data = (await response.json()) as { subjects: Subject[] };
-    setSubjects(data.subjects);
+    applySubjects(await readSubjectsResponse(response), selectedSubject.id);
     setUnitEmailDrafts((current) => ({ ...current, [unitId]: "" }));
     setIsSaving(false);
   }
@@ -166,8 +179,7 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: emailToRemove })
     });
-    const data = (await response.json()) as { subjects: Subject[] };
-    setSubjects(data.subjects);
+    applySubjects(await readSubjectsResponse(response), subjectId);
     setIsSaving(false);
   }
 
@@ -185,8 +197,7 @@ export default function AdminPage() {
         body: JSON.stringify(draft)
       }
     );
-    const data = (await response.json()) as { subjects: Subject[] };
-    setSubjects(data.subjects);
+    applySubjects(await readSubjectsResponse(response), selectedSubject.id);
     setSubtopicDrafts((current) => ({ ...current, [topicId]: { title: "", driveUrl: "" } }));
     setIsSaving(false);
   }
@@ -210,10 +221,25 @@ export default function AdminPage() {
         body: JSON.stringify(draft)
       }
     );
-    const data = (await response.json()) as { subjects: Subject[] };
-    setSubjects(data.subjects);
+    applySubjects(await readSubjectsResponse(response), selectedSubject.id);
     setEditingSubtopicId("");
     setSubtopicEditDrafts((current) => ({ ...current, [subtopicId]: { title: "", driveUrl: "" } }));
+    setIsSaving(false);
+  }
+
+  async function handleDeleteSubtopic(unitId: string, topicId: string, subtopicId: string, subtopicTitle: string) {
+    if (!selectedSubject) return;
+    if (!window.confirm(`Delete ${subtopicTitle}?`)) return;
+
+    setIsSaving(true);
+    const response = await fetch(
+      `/api/admin/subjects/${selectedSubject.id}/units/${unitId}/topics/${topicId}/subtopics/${subtopicId}`,
+      {
+        method: "DELETE"
+      }
+    );
+    applySubjects(await readSubjectsResponse(response), selectedSubject.id);
+    setEditingSubtopicId((current) => (current === subtopicId ? "" : current));
     setIsSaving(false);
   }
 
@@ -224,8 +250,22 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: emailToRemove })
     });
-    const data = (await response.json()) as { subjects: Subject[] };
-    setSubjects(data.subjects);
+    applySubjects(await readSubjectsResponse(response), subjectId);
+    setIsSaving(false);
+  }
+
+  async function handleDeleteSubject(subjectId: string, subjectName: string) {
+    if (!window.confirm(`Delete ${subjectName}? This will also remove its units, topics, and access list.`)) return;
+
+    setIsSaving(true);
+    const response = await fetch(`/api/admin/subjects/${subjectId}`, {
+      method: "DELETE"
+    });
+    const data = await readSubjectsResponse(response);
+    const nextSubjectId =
+      selectedSubjectId === subjectId ? data.subjects[0]?.id ?? "" : selectedSubjectId;
+
+    applySubjects(data, nextSubjectId);
     setIsSaving(false);
   }
 
@@ -270,15 +310,26 @@ export default function AdminPage() {
 
         <div className="admin-subject-list">
           {subjects.map((subject) => (
-            <button
-              className={selectedSubject?.id === subject.id ? "admin-subject-button active" : "admin-subject-button"}
-              key={subject.id}
-              onClick={() => setSelectedSubjectId(subject.id)}
-            >
-              <span className="subject-dot" style={{ background: subject.color }} />
-              <span>{subject.name}</span>
-              <strong>{subject.allowedEmails.length}</strong>
-            </button>
+            <div className="admin-subject-row" key={subject.id}>
+              <button
+                className={selectedSubject?.id === subject.id ? "admin-subject-button active" : "admin-subject-button"}
+                onClick={() => setSelectedSubjectId(subject.id)}
+                type="button"
+              >
+                <span className="subject-dot" style={{ background: subject.color }} />
+                <span>{subject.name}</span>
+                <strong>{subject.allowedEmails.length}</strong>
+              </button>
+              <button
+                className="admin-subject-delete"
+                disabled={isSaving}
+                onClick={() => void handleDeleteSubject(subject.id, subject.name)}
+                title={`Delete ${subject.name}`}
+                type="button"
+              >
+                <Trash2 size={15} aria-hidden="true" />
+              </button>
+            </div>
           ))}
         </div>
       </aside>
@@ -299,6 +350,12 @@ export default function AdminPage() {
           <div className="admin-empty">
             <Loader2 size={28} aria-hidden="true" />
             <strong>Loading subjects</strong>
+          </div>
+        ) : loadError ? (
+          <div className="admin-empty">
+            <X size={28} aria-hidden="true" />
+            <strong>Database setup error</strong>
+            <span>{loadError}</span>
           </div>
         ) : selectedSubject ? (
           <div className="admin-panel">
@@ -545,6 +602,17 @@ export default function AdminPage() {
                                   >
                                     <Pencil size={14} aria-hidden="true" />
                                   </button>
+                                  <button
+                                    className="danger"
+                                    type="button"
+                                    disabled={isSaving}
+                                    onClick={() =>
+                                      void handleDeleteSubtopic(unit.id, topic.id, subtopic.id, subtopic.title)
+                                    }
+                                    title="Delete subtopic"
+                                  >
+                                    <Trash2 size={14} aria-hidden="true" />
+                                  </button>
                                 </div>
                               );
                             })}
@@ -619,8 +687,27 @@ function getUnitTopics(unit: CourseUnit): CourseTopic[] {
   if (unit.topicItems?.length) return unit.topicItems;
 
   return unit.topics.map((topic) => ({
-    id: `${unit.id}-${topic.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`,
+    id: `${unit.id}-${slugify(topic)}`,
     title: topic,
     subtopics: []
   }));
+}
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+async function readSubjectsResponse(response: Response) {
+  const text = await response.text();
+  const data = text ? (JSON.parse(text) as { subjects?: Subject[]; error?: string }) : {};
+
+  if (!response.ok) {
+    throw new Error(data.error ?? `Request failed with status ${response.status}.`);
+  }
+
+  return { subjects: data.subjects ?? [] };
 }

@@ -53,6 +53,7 @@ type StoreSnapshot = {
 };
 
 let supabaseClient: ReturnType<typeof createSupabaseAdminClient> | null = null;
+let seedDataPromise: Promise<void> | null = null;
 
 function getSupabase() {
   supabaseClient ??= createSupabaseAdminClient();
@@ -60,7 +61,7 @@ function getSupabase() {
 }
 
 export async function getAdminSubjects() {
-  await ensureSeedData();
+  await ensureSeedDataOnce();
   const snapshot = await readStore();
 
   return buildSubjects(snapshot);
@@ -83,6 +84,12 @@ export async function addSubject(name: string) {
       display_order: existingSubjects.length
     })
   );
+
+  return getAdminSubjects();
+}
+
+export async function removeSubject(subjectId: string) {
+  await runQuery(getSupabase().from("admin_subjects").delete().eq("id", subjectId));
 
   return getAdminSubjects();
 }
@@ -272,6 +279,12 @@ export async function updateTopicSubtopic(
   return getAdminSubjects();
 }
 
+export async function removeTopicSubtopic(subjectId: string, unitId: string, topicId: string, subtopicId: string) {
+  await runQuery(getSupabase().from("admin_subtopics").delete().eq("id", subtopicId).eq("topic_id", topicId));
+
+  return getAdminSubjects();
+}
+
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
@@ -290,64 +303,70 @@ function pickSubjectColor(index: number) {
 }
 
 async function ensureSeedData() {
-  const existing = await runQuery(getSupabase().from("admin_subjects").select("id"));
-  const existingSubjectIds = new Set((existing.data ?? []).map((subject) => subject.id));
+  const subjectRows = subjectsSeed.map((subject, subjectIndex) => ({
+    id: subject.id,
+    name: subject.name,
+    color: subject.color,
+    display_order: subjectIndex
+  }));
 
-  for (const [subjectIndex, subject] of subjectsSeed.entries()) {
-    if (!existingSubjectIds.has(subject.id)) {
-      await runQuery(
-        getSupabase().from("admin_subjects").insert({
-          id: subject.id,
-          name: subject.name,
-          color: subject.color,
-          display_order: subjectIndex
-        })
-      );
-    }
+  const subjectTopicRows = subjectsSeed.flatMap((subject) =>
+    subject.topics.map((topic, topicIndex) => ({
+      subject_id: subject.id,
+      title: topic,
+      display_order: topicIndex
+    }))
+  );
 
-    for (const [topicIndex, topic] of subject.topics.entries()) {
-      await runQuery(
-        getSupabase().from("admin_subject_topics").upsert(
-          {
-            subject_id: subject.id,
-            title: topic,
-            display_order: topicIndex
-          },
-          { onConflict: "subject_id,title" }
+  const unitRows = subjectsSeed.flatMap((subject) =>
+    (subject.units ?? []).map((unit, unitIndex) => ({
+      id: unit.id,
+      subject_id: subject.id,
+      title: unit.title,
+      revision_note_count: unit.revisionNoteCount,
+      display_order: unitIndex
+    }))
+  );
+
+  const topicRows = subjectsSeed.flatMap((subject) =>
+    (subject.units ?? []).flatMap((unit) =>
+      getUnitTopicItems(unit).map((topic, topicIndex) => ({
+        id: topic.id,
+        unit_id: unit.id,
+        title: topic.title,
+        display_order: topicIndex
+      }))
+    )
+  );
+
+  await runQuery(
+    getSupabase().from("admin_subjects").upsert(subjectRows, { onConflict: "id", ignoreDuplicates: true })
+  );
+
+  await Promise.all([
+    subjectTopicRows.length
+      ? runQuery(
+          getSupabase()
+            .from("admin_subject_topics")
+            .upsert(subjectTopicRows, { onConflict: "subject_id,title", ignoreDuplicates: true })
         )
-      );
-    }
+      : Promise.resolve(null),
+    unitRows.length
+      ? runQuery(getSupabase().from("admin_units").upsert(unitRows, { onConflict: "id", ignoreDuplicates: true }))
+      : Promise.resolve(null),
+    topicRows.length
+      ? runQuery(getSupabase().from("admin_topics").upsert(topicRows, { onConflict: "id", ignoreDuplicates: true }))
+      : Promise.resolve(null)
+  ]);
+}
 
-    for (const [unitIndex, unit] of (subject.units ?? []).entries()) {
-      await runQuery(
-        getSupabase().from("admin_units").upsert(
-          {
-            id: unit.id,
-            subject_id: subject.id,
-            title: unit.title,
-            revision_note_count: unit.revisionNoteCount,
-            display_order: unitIndex
-          },
-          { onConflict: "id" }
-        )
-      );
+async function ensureSeedDataOnce() {
+  seedDataPromise ??= ensureSeedData().catch((error) => {
+    seedDataPromise = null;
+    throw error;
+  });
 
-      const topicItems = getUnitTopicItems(unit);
-      for (const [topicIndex, topic] of topicItems.entries()) {
-        await runQuery(
-          getSupabase().from("admin_topics").upsert(
-            {
-              id: topic.id,
-              unit_id: unit.id,
-              title: topic.title,
-              display_order: topicIndex
-            },
-            { onConflict: "id" }
-          )
-        );
-      }
-    }
-  }
+  await seedDataPromise;
 }
 
 async function ensureSubject(subjectId: string) {
@@ -358,12 +377,17 @@ async function ensureSubject(subjectId: string) {
   const subjectCount = await countRows("admin_subjects");
 
   await runQuery(
-    getSupabase().from("admin_subjects").insert({
-      id: subjectId,
-      name: seedSubject?.name ?? subjectId,
-      color: seedSubject?.color ?? pickSubjectColor(subjectCount),
-      display_order: subjectCount
-    })
+    getSupabase()
+      .from("admin_subjects")
+      .upsert(
+        {
+          id: subjectId,
+          name: seedSubject?.name ?? subjectId,
+          color: seedSubject?.color ?? pickSubjectColor(subjectCount),
+          display_order: subjectCount
+        },
+        { onConflict: "id" }
+      )
   );
 }
 

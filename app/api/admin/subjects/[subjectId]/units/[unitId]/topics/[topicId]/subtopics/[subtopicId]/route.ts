@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { updateTopicSubtopic } from "@/lib/server/admin-store";
+import { removeTopicSubtopic, updateTopicSubtopic } from "@/lib/server/admin-store";
 
 type RouteContext = {
   params: Promise<{
@@ -21,6 +21,13 @@ export async function PATCH(request: Request, context: RouteContext) {
     body.title ?? "",
     body.driveUrl ?? ""
   );
+
+  return NextResponse.json({ subjects });
+}
+
+export async function DELETE(request: Request, context: RouteContext) {
+  const { subjectId, unitId, topicId, subtopicId } = await context.params;
+  const subjects = await removeTopicSubtopic(subjectId, unitId, topicId, subtopicId);
 
   return NextResponse.json({ subjects });
 }
