@@ -1,208 +1,220 @@
-import { mkdir, readFile, writeFile } from "fs/promises";
-import path from "path";
 import { subjectsSeed, type CourseSubtopic, type CourseTopic, type CourseUnit, type Subject } from "@/lib/lessons";
+import type { Database } from "@/lib/supabase/database.types";
+import { createSupabaseAdminClient } from "@/lib/supabase/server";
 
-type AdminStore = {
-  subjects: Subject[];
+type SubjectRow = {
+  id: string;
+  name: string;
+  color: string;
+  display_order: number;
 };
 
-const storePath = path.join(process.cwd(), "data", "admin-access.json");
+type SubjectTopicRow = {
+  subject_id: string;
+  title: string;
+  display_order: number;
+};
+
+type UnitRow = {
+  id: string;
+  subject_id: string;
+  title: string;
+  revision_note_count: number;
+  display_order: number;
+};
+
+type TopicRow = {
+  id: string;
+  unit_id: string;
+  title: string;
+  display_order: number;
+};
+
+type SubtopicRow = {
+  id: string;
+  topic_id: string;
+  title: string;
+  drive_url: string;
+  display_order: number;
+};
+
+type AccessRow = {
+  email: string;
+};
+
+type StoreSnapshot = {
+  subjects: SubjectRow[];
+  subjectTopics: SubjectTopicRow[];
+  subjectAccess: Record<string, string[]>;
+  units: UnitRow[];
+  unitAccess: Record<string, string[]>;
+  topics: TopicRow[];
+  subtopics: SubtopicRow[];
+};
+
+let supabaseClient: ReturnType<typeof createSupabaseAdminClient> | null = null;
+
+function getSupabase() {
+  supabaseClient ??= createSupabaseAdminClient();
+  return supabaseClient;
+}
 
 export async function getAdminSubjects() {
-  const store = await readStore();
-  const storedIds = new Set(store.subjects.map((subject) => subject.id));
-  const missingSeedSubjects = subjectsSeed.filter((subject) => !storedIds.has(subject.id));
+  await ensureSeedData();
+  const snapshot = await readStore();
 
-  return [...store.subjects, ...missingSeedSubjects];
+  return buildSubjects(snapshot);
 }
 
 export async function addSubject(name: string) {
-  const store = await readStore();
   const trimmedName = name.trim();
   const id = slugify(trimmedName);
 
-  if (!trimmedName || store.subjects.some((subject) => subject.id === id)) {
-    return getAdminSubjects();
-  }
+  if (!trimmedName) return getAdminSubjects();
 
-  store.subjects.push({
-    id,
-    name: trimmedName,
-    color: pickSubjectColor(store.subjects.length),
-    topics: [],
-    allowedEmails: [],
-    units: []
-  });
+  const existingSubjects = await getAdminSubjects();
+  if (existingSubjects.some((subject) => subject.id === id)) return existingSubjects;
 
-  await writeStore(store);
+  await runQuery(
+    getSupabase().from("admin_subjects").insert({
+      id,
+      name: trimmedName,
+      color: pickSubjectColor(existingSubjects.length),
+      display_order: existingSubjects.length
+    })
+  );
+
   return getAdminSubjects();
 }
 
 export async function addSubjectAccess(subjectId: string, email: string) {
   const normalizedEmail = normalizeEmail(email);
-  const store = await readStore();
-  const subject = store.subjects.find((item) => item.id === subjectId);
 
-  if (!subject) {
-    store.subjects.push({
-      id: subjectId,
-      name: subjectId,
-      color: pickSubjectColor(store.subjects.length),
-      topics: [],
-      allowedEmails: normalizedEmail ? [normalizedEmail] : [],
-      units: []
-    });
-  } else if (normalizedEmail && !subject.allowedEmails.includes(normalizedEmail)) {
-    subject.allowedEmails.push(normalizedEmail);
-  }
+  if (!normalizedEmail) return getAdminSubjects();
 
-  await writeStore(store);
+  await ensureSubject(subjectId);
+  await runQuery(
+    getSupabase().from("admin_subject_access").upsert(
+      {
+        subject_id: subjectId,
+        email: normalizedEmail
+      },
+      { onConflict: "subject_id,email" }
+    )
+  );
+
   return getAdminSubjects();
 }
 
 export async function removeSubjectAccess(subjectId: string, email: string) {
   const normalizedEmail = normalizeEmail(email);
-  const store = await readStore();
-  const subject = store.subjects.find((item) => item.id === subjectId);
 
-  if (subject) {
-    subject.allowedEmails = subject.allowedEmails.filter((item) => item !== normalizedEmail);
-    await writeStore(store);
-  }
+  await runQuery(
+    getSupabase().from("admin_subject_access").delete().eq("subject_id", subjectId).eq("email", normalizedEmail)
+  );
 
   return getAdminSubjects();
 }
 
 export async function addUnitAccess(subjectId: string, unitId: string, email: string) {
   const normalizedEmail = normalizeEmail(email);
-  const store = await readStore();
-  const subject = store.subjects.find((item) => item.id === subjectId);
 
-  if (!subject || !normalizedEmail) return getAdminSubjects();
+  if (!normalizedEmail) return getAdminSubjects();
 
-  subject.units = (subject.units ?? []).map((unit) => {
-    if (unit.id !== unitId || unit.allowedEmails?.includes(normalizedEmail)) return unit;
-    return {
-      ...unit,
-      allowedEmails: [...(unit.allowedEmails ?? []), normalizedEmail]
-    };
-  });
+  await ensureSubject(subjectId);
+  await runQuery(
+    getSupabase().from("admin_unit_access").upsert(
+      {
+        unit_id: unitId,
+        email: normalizedEmail
+      },
+      { onConflict: "unit_id,email" }
+    )
+  );
 
-  await writeStore(store);
   return getAdminSubjects();
 }
 
 export async function removeUnitAccess(subjectId: string, unitId: string, email: string) {
   const normalizedEmail = normalizeEmail(email);
-  const store = await readStore();
-  const subject = store.subjects.find((item) => item.id === subjectId);
 
-  if (!subject) return getAdminSubjects();
+  await runQuery(getSupabase().from("admin_unit_access").delete().eq("unit_id", unitId).eq("email", normalizedEmail));
 
-  subject.units = (subject.units ?? []).map((unit) => {
-    if (unit.id !== unitId) return unit;
-    return {
-      ...unit,
-      allowedEmails: (unit.allowedEmails ?? []).filter((item) => item !== normalizedEmail)
-    };
-  });
-
-  await writeStore(store);
   return getAdminSubjects();
 }
 
 export async function addSubjectUnit(subjectId: string, title: string) {
-  const store = await readStore();
-  const subject = store.subjects.find((item) => item.id === subjectId);
   const trimmedTitle = title.trim();
 
-  if (!subject || !trimmedTitle) return getAdminSubjects();
+  if (!trimmedTitle) return getAdminSubjects();
 
-  const units = subject.units ?? [];
-  const unit: CourseUnit = {
-    id: `${subjectId}-${slugify(trimmedTitle)}-${Date.now()}`,
-    title: trimmedTitle,
-    topicCount: 0,
-    revisionNoteCount: 0,
-    topics: [],
-    allowedEmails: [],
-    topicItems: []
-  };
+  await ensureSubject(subjectId);
+  const unitCount = await countRows("admin_units", "subject_id", subjectId);
 
-  subject.units = [...units, unit];
-  await writeStore(store);
+  await runQuery(
+    getSupabase().from("admin_units").insert({
+      id: `${subjectId}-${slugify(trimmedTitle)}-${Date.now()}`,
+      subject_id: subjectId,
+      title: trimmedTitle,
+      revision_note_count: 0,
+      display_order: unitCount
+    })
+  );
+
   return getAdminSubjects();
 }
 
 export async function addUnitTopic(subjectId: string, unitId: string, topic: string) {
-  const store = await readStore();
-  const subject = store.subjects.find((item) => item.id === subjectId);
   const trimmedTopic = topic.trim();
 
-  if (!subject || !trimmedTopic) return getAdminSubjects();
+  if (!trimmedTopic) return getAdminSubjects();
 
-  subject.units = (subject.units ?? []).map((unit) => {
-    if (unit.id !== unitId || unit.topics.includes(trimmedTopic)) return unit;
-    const topics = [...unit.topics, trimmedTopic];
-    const topicItems = [
-      ...getUnitTopicItems(unit),
-      {
+  await ensureSubject(subjectId);
+  const existing = await runQuery(
+    getSupabase().from("admin_topics").select("id").eq("unit_id", unitId).eq("title", trimmedTopic).maybeSingle()
+  );
+
+  if (!existing.data) {
+    const topicCount = await countRows("admin_topics", "unit_id", unitId);
+
+    await runQuery(
+      getSupabase().from("admin_topics").insert({
         id: `${unitId}-${slugify(trimmedTopic)}-${Date.now()}`,
+        unit_id: unitId,
         title: trimmedTopic,
-        subtopics: []
-      }
-    ];
-
-    return {
-      ...unit,
-      topics,
-      topicItems,
-      topicCount: topics.length
-    };
-  });
-
-  if (!subject.topics.includes(trimmedTopic)) {
-    subject.topics.push(trimmedTopic);
+        display_order: topicCount
+      })
+    );
   }
 
-  await writeStore(store);
+  await upsertSubjectTopic(subjectId, trimmedTopic);
+
   return getAdminSubjects();
 }
 
 export async function updateUnitTopic(subjectId: string, unitId: string, topicId: string, title: string) {
-  const store = await readStore();
-  const subject = store.subjects.find((item) => item.id === subjectId);
   const trimmedTitle = title.trim();
 
-  if (!subject || !trimmedTitle) return getAdminSubjects();
+  if (!trimmedTitle) return getAdminSubjects();
 
-  let previousTitle = "";
+  const previous = await runQuery(
+    getSupabase().from("admin_topics").select("title").eq("id", topicId).eq("unit_id", unitId).maybeSingle()
+  );
 
-  subject.units = (subject.units ?? []).map((unit) => {
-    if (unit.id !== unitId) return unit;
+  await runQuery(getSupabase().from("admin_topics").update({ title: trimmedTitle }).eq("id", topicId).eq("unit_id", unitId));
 
-    const topicItems = getUnitTopicItems(unit).map((topic) => {
-      if (topic.id !== topicId) return topic;
-      previousTitle = topic.title;
-      return {
-        ...topic,
-        title: trimmedTitle
-      };
-    });
-
-    return {
-      ...unit,
-      topicItems,
-      topics: topicItems.map((topic) => topic.title),
-      topicCount: topicItems.length
-    };
-  });
-
-  if (previousTitle) {
-    subject.topics = subject.topics.map((topic) => (topic === previousTitle ? trimmedTitle : topic));
+  if (previous.data?.title) {
+    await runQuery(
+      getSupabase()
+        .from("admin_subject_topics")
+        .update({ title: trimmedTitle })
+        .eq("subject_id", subjectId)
+        .eq("title", previous.data.title)
+    );
+  } else {
+    await upsertSubjectTopic(subjectId, trimmedTitle);
   }
 
-  await writeStore(store);
   return getAdminSubjects();
 }
 
@@ -213,35 +225,23 @@ export async function addTopicSubtopic(
   title: string,
   driveUrl: string
 ) {
-  const store = await readStore();
-  const subject = store.subjects.find((item) => item.id === subjectId);
   const trimmedTitle = title.trim();
   const trimmedDriveUrl = driveUrl.trim();
 
-  if (!subject || !trimmedTitle || !trimmedDriveUrl) return getAdminSubjects();
+  if (!trimmedTitle || !trimmedDriveUrl) return getAdminSubjects();
 
-  subject.units = (subject.units ?? []).map((unit) => {
-    if (unit.id !== unitId) return unit;
+  const subtopicCount = await countRows("admin_subtopics", "topic_id", topicId);
 
-    const topicItems = getUnitTopicItems(unit).map((topic) => {
-      if (topic.id !== topicId) return topic;
+  await runQuery(
+    getSupabase().from("admin_subtopics").insert({
+      id: `${topicId}-${slugify(trimmedTitle)}-${Date.now()}`,
+      topic_id: topicId,
+      title: trimmedTitle,
+      drive_url: trimmedDriveUrl,
+      display_order: subtopicCount
+    })
+  );
 
-      const subtopic: CourseSubtopic = {
-        id: `${topicId}-${slugify(trimmedTitle)}-${Date.now()}`,
-        title: trimmedTitle,
-        driveUrl: trimmedDriveUrl
-      };
-
-      return {
-        ...topic,
-        subtopics: [...topic.subtopics, subtopic]
-      };
-    });
-
-    return { ...unit, topicItems };
-  });
-
-  await writeStore(store);
   return getAdminSubjects();
 }
 
@@ -253,36 +253,22 @@ export async function updateTopicSubtopic(
   title: string,
   driveUrl: string
 ) {
-  const store = await readStore();
-  const subject = store.subjects.find((item) => item.id === subjectId);
   const trimmedTitle = title.trim();
   const trimmedDriveUrl = driveUrl.trim();
 
-  if (!subject || !trimmedTitle || !trimmedDriveUrl) return getAdminSubjects();
+  if (!trimmedTitle || !trimmedDriveUrl) return getAdminSubjects();
 
-  subject.units = (subject.units ?? []).map((unit) => {
-    if (unit.id !== unitId) return unit;
+  await runQuery(
+    getSupabase()
+      .from("admin_subtopics")
+      .update({
+        title: trimmedTitle,
+        drive_url: trimmedDriveUrl
+      })
+      .eq("id", subtopicId)
+      .eq("topic_id", topicId)
+  );
 
-    const topicItems = getUnitTopicItems(unit).map((topic) => {
-      if (topic.id !== topicId) return topic;
-
-      return {
-        ...topic,
-        subtopics: topic.subtopics.map((subtopic) => {
-          if (subtopic.id !== subtopicId) return subtopic;
-          return {
-            ...subtopic,
-            title: trimmedTitle,
-            driveUrl: trimmedDriveUrl
-          };
-        })
-      };
-    });
-
-    return { ...unit, topicItems };
-  });
-
-  await writeStore(store);
   return getAdminSubjects();
 }
 
@@ -303,48 +289,169 @@ function pickSubjectColor(index: number) {
   return colors[index % colors.length];
 }
 
-async function readStore(): Promise<AdminStore> {
-  try {
-    const rawStore = await readFile(storePath, "utf8");
-    const parsedStore = JSON.parse(rawStore) as Partial<AdminStore>;
-    const storedSubjects = parsedStore.subjects ?? [];
+async function ensureSeedData() {
+  const existing = await runQuery(getSupabase().from("admin_subjects").select("id"));
+  const existingSubjectIds = new Set((existing.data ?? []).map((subject) => subject.id));
 
-    return {
-      subjects: hydrateStoredSubjects(storedSubjects)
-    };
-  } catch {
-    const initialStore = {
-      subjects: subjectsSeed
-    };
-    await writeStore(initialStore);
-    return initialStore;
+  for (const [subjectIndex, subject] of subjectsSeed.entries()) {
+    if (!existingSubjectIds.has(subject.id)) {
+      await runQuery(
+        getSupabase().from("admin_subjects").insert({
+          id: subject.id,
+          name: subject.name,
+          color: subject.color,
+          display_order: subjectIndex
+        })
+      );
+    }
+
+    for (const [topicIndex, topic] of subject.topics.entries()) {
+      await runQuery(
+        getSupabase().from("admin_subject_topics").upsert(
+          {
+            subject_id: subject.id,
+            title: topic,
+            display_order: topicIndex
+          },
+          { onConflict: "subject_id,title" }
+        )
+      );
+    }
+
+    for (const [unitIndex, unit] of (subject.units ?? []).entries()) {
+      await runQuery(
+        getSupabase().from("admin_units").upsert(
+          {
+            id: unit.id,
+            subject_id: subject.id,
+            title: unit.title,
+            revision_note_count: unit.revisionNoteCount,
+            display_order: unitIndex
+          },
+          { onConflict: "id" }
+        )
+      );
+
+      const topicItems = getUnitTopicItems(unit);
+      for (const [topicIndex, topic] of topicItems.entries()) {
+        await runQuery(
+          getSupabase().from("admin_topics").upsert(
+            {
+              id: topic.id,
+              unit_id: unit.id,
+              title: topic.title,
+              display_order: topicIndex
+            },
+            { onConflict: "id" }
+          )
+        );
+      }
+    }
   }
 }
 
-function hydrateStoredSubjects(storedSubjects: Partial<Subject>[]): Subject[] {
-  return storedSubjects.map((storedSubject, index) => {
-    const seedSubject = subjectsSeed.find((subject) => subject.id === storedSubject.id);
+async function ensureSubject(subjectId: string) {
+  const existing = await runQuery(getSupabase().from("admin_subjects").select("id").eq("id", subjectId).maybeSingle());
+  if (existing.data) return;
+
+  const seedSubject = subjectsSeed.find((subject) => subject.id === subjectId);
+  const subjectCount = await countRows("admin_subjects");
+
+  await runQuery(
+    getSupabase().from("admin_subjects").insert({
+      id: subjectId,
+      name: seedSubject?.name ?? subjectId,
+      color: seedSubject?.color ?? pickSubjectColor(subjectCount),
+      display_order: subjectCount
+    })
+  );
+}
+
+async function upsertSubjectTopic(subjectId: string, title: string) {
+  const topicCount = await countRows("admin_subject_topics", "subject_id", subjectId);
+
+  await runQuery(
+    getSupabase().from("admin_subject_topics").upsert(
+      {
+        subject_id: subjectId,
+        title,
+        display_order: topicCount
+      },
+      { onConflict: "subject_id,title", ignoreDuplicates: true }
+    )
+  );
+}
+
+async function readStore(): Promise<StoreSnapshot> {
+  const [subjects, subjectTopics, subjectAccess, units, unitAccess, topics, subtopics] = await Promise.all([
+    runQuery(getSupabase().from("admin_subjects").select("*").order("display_order", { ascending: true })),
+    runQuery(getSupabase().from("admin_subject_topics").select("*").order("display_order", { ascending: true })),
+    runQuery(getSupabase().from("admin_subject_access").select("subject_id,email").order("email", { ascending: true })),
+    runQuery(getSupabase().from("admin_units").select("*").order("display_order", { ascending: true })),
+    runQuery(getSupabase().from("admin_unit_access").select("unit_id,email").order("email", { ascending: true })),
+    runQuery(getSupabase().from("admin_topics").select("*").order("display_order", { ascending: true })),
+    runQuery(getSupabase().from("admin_subtopics").select("*").order("display_order", { ascending: true }))
+  ]);
+
+  return {
+    subjects: (subjects.data ?? []) as SubjectRow[],
+    subjectTopics: (subjectTopics.data ?? []) as SubjectTopicRow[],
+    subjectAccess: groupAccessByOwner(subjectAccess.data ?? [], "subject_id"),
+    units: (units.data ?? []) as UnitRow[],
+    unitAccess: groupAccessByOwner(unitAccess.data ?? [], "unit_id"),
+    topics: (topics.data ?? []) as TopicRow[],
+    subtopics: (subtopics.data ?? []) as SubtopicRow[]
+  };
+}
+
+function buildSubjects(snapshot: StoreSnapshot): Subject[] {
+  return snapshot.subjects.map((subject) => {
+    const units = snapshot.units
+      .filter((unit) => unit.subject_id === subject.id)
+      .map((unit) => buildUnit(unit, snapshot));
+
+    const subjectTopics = snapshot.subjectTopics
+      .filter((topic) => topic.subject_id === subject.id)
+      .map((topic) => topic.title);
 
     return {
-      id: storedSubject.id ?? seedSubject?.id ?? `subject-${index}`,
-      name: storedSubject.name ?? seedSubject?.name ?? "Untitled subject",
-      color: storedSubject.color ?? seedSubject?.color ?? pickSubjectColor(index),
-      topics: storedSubject.topics ?? seedSubject?.topics ?? [],
-      allowedEmails: storedSubject.allowedEmails ?? seedSubject?.allowedEmails ?? [],
-      units: (storedSubject.units ?? seedSubject?.units ?? []).map(hydrateUnitTopics)
+      id: subject.id,
+      name: subject.name,
+      color: subject.color,
+      topics: subjectTopics.length ? subjectTopics : units.flatMap((unit) => unit.topics),
+      allowedEmails: snapshot.subjectAccess[subject.id] ?? [],
+      units
     };
   });
 }
 
-function hydrateUnitTopics(unit: CourseUnit): CourseUnit {
-  const topicItems = getUnitTopicItems(unit);
+function buildUnit(unit: UnitRow, snapshot: StoreSnapshot): CourseUnit {
+  const topicItems = snapshot.topics
+    .filter((topic) => topic.unit_id === unit.id)
+    .map((topic) => buildTopic(topic, snapshot));
 
   return {
-    ...unit,
-    allowedEmails: unit.allowedEmails ?? [],
-    topicItems,
-    topicCount: topicItems.length || unit.topicCount,
-    topics: topicItems.map((topic) => topic.title)
+    id: unit.id,
+    title: unit.title,
+    topicCount: topicItems.length,
+    revisionNoteCount: unit.revision_note_count,
+    topics: topicItems.map((topic) => topic.title),
+    allowedEmails: snapshot.unitAccess[unit.id] ?? [],
+    topicItems
+  };
+}
+
+function buildTopic(topic: TopicRow, snapshot: StoreSnapshot): CourseTopic {
+  return {
+    id: topic.id,
+    title: topic.title,
+    subtopics: snapshot.subtopics
+      .filter((subtopic) => subtopic.topic_id === topic.id)
+      .map((subtopic): CourseSubtopic => ({
+        id: subtopic.id,
+        title: subtopic.title,
+        driveUrl: subtopic.drive_url
+      }))
   };
 }
 
@@ -358,7 +465,31 @@ function getUnitTopicItems(unit: CourseUnit): CourseTopic[] {
   }));
 }
 
-async function writeStore(store: AdminStore) {
-  await mkdir(path.dirname(storePath), { recursive: true });
-  await writeFile(storePath, JSON.stringify(store, null, 2));
+function groupAccessByOwner(rows: unknown[], ownerKey: "subject_id" | "unit_id") {
+  return rows.reduce<Record<string, string[]>>((grouped, row) => {
+    const accessRow = row as AccessRow & Record<typeof ownerKey, string>;
+    grouped[accessRow[ownerKey]] = [...(grouped[accessRow[ownerKey]] ?? []), accessRow.email];
+    return grouped;
+  }, {});
+}
+
+async function countRows(table: keyof Database["public"]["Tables"], column?: string, value?: string) {
+  let query = getSupabase().from(table).select("*", { count: "exact", head: true });
+
+  if (column && value) {
+    query = query.eq(column, value);
+  }
+
+  const result = await runQuery(query);
+  return result.count ?? 0;
+}
+
+async function runQuery<T>(query: PromiseLike<{ data: T; error: { message: string } | null; count?: number | null }>) {
+  const result = await query;
+
+  if (result.error) {
+    throw new Error(result.error.message);
+  }
+
+  return result;
 }

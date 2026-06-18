@@ -26,17 +26,10 @@ import {
   type Subject
 } from "@/lib/lessons";
 
-const STORAGE_KEY = "edexcel-recorded-lessons";
-
-type StoredData = {
-  subjects: Subject[];
-  lessons: Lesson[];
-};
-
 export default function Home() {
   const router = useRouter();
   const [subjects, setSubjects] = useState<Subject[]>(subjectsSeed);
-  const [lessons, setLessons] = useState<Lesson[]>(lessonsSeed);
+  const lessons = lessonsSeed;
   const [selectedSubject, setSelectedSubject] = useState(subjectsSeed[0]?.id ?? "all");
   const [selectedTopic, setSelectedTopic] = useState("all");
   const [openCourseUnit, setOpenCourseUnit] = useState("ial-physics-unit-1");
@@ -57,26 +50,7 @@ export default function Home() {
     setStudentEmail(loggedEmail);
 
     void loadStudentAccess(loggedEmail);
-
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (!stored) return;
-
-    try {
-      const data = JSON.parse(stored) as StoredData;
-      if (data.subjects?.length && data.lessons?.length) {
-        const normalizedLessons = removeLegacySubjectLessons(data.lessons);
-        const migratedLessons = mergeSeedLessons(normalizedLessons);
-        setLessons(migratedLessons);
-        setSelectedLessonId(migratedLessons[0].id);
-      }
-    } catch {
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
   }, [router]);
-
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ subjects, lessons }));
-  }, [subjects, lessons]);
 
   async function loadStudentAccess(email: string) {
     setIsLoadingAccess(true);
