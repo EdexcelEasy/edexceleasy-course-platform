@@ -84,34 +84,6 @@ button {
   font-size: 28px;
 }
 
-.role-switch {
-  background: #eef2f7;
-  border-radius: 8px;
-  display: grid;
-  gap: 6px;
-  grid-template-columns: 1fr 1fr;
-  padding: 6px;
-}
-
-.role-switch button {
-  align-items: center;
-  background: transparent;
-  border: 0;
-  border-radius: 7px;
-  color: var(--muted);
-  display: inline-flex;
-  font-weight: 900;
-  gap: 8px;
-  justify-content: center;
-  min-height: 42px;
-}
-
-.role-switch button.active {
-  background: #ffffff;
-  color: var(--brand-dark);
-  box-shadow: 0 8px 22px rgba(26, 35, 55, 0.1);
-}
-
 .login-form {
   display: grid;
   gap: 14px;
@@ -186,6 +158,13 @@ button {
 .student-account strong {
   color: #ffffff;
   font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.student-account small {
+  color: #aeb9cc;
+  font-size: 12px;
+  font-weight: 800;
   overflow-wrap: anywhere;
 }
 
@@ -1075,29 +1054,8 @@ h2 {
   padding: 24px 18px;
 }
 
-.admin-section-switch {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: 1fr 1fr;
-}
-
-.admin-section-switch button {
-  align-items: center;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  color: #e5e7eb;
-  display: inline-flex;
-  font-weight: 800;
-  gap: 8px;
-  justify-content: center;
-  min-height: 42px;
-  padding: 8px;
-}
-
-.admin-section-switch button.active,
-.admin-section-switch button:hover {
-  background: rgba(255, 255, 255, 0.14);
+.admin-sidebar .category-menu button {
+  grid-template-columns: 17px minmax(0, 1fr);
 }
 
 .admin-subject-list {
@@ -1453,6 +1411,148 @@ h2 {
   padding: 0;
 }
 
+.admin-student-form {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(140px, 0.8fr) minmax(180px, 1fr) minmax(140px, 0.8fr) 150px;
+}
+
+.admin-student-form input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 44px;
+  min-width: 0;
+  padding: 0 12px;
+}
+
+.admin-student-form button {
+  align-items: center;
+  background: var(--brand);
+  border: 0;
+  border-radius: 8px;
+  color: #ffffff;
+  display: inline-flex;
+  font-weight: 900;
+  gap: 8px;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+
+.admin-student-form button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.admin-student-summary {
+  align-items: center;
+  background: #eef4ff;
+  border: 1px solid #dbe4ff;
+  border-radius: 8px;
+  color: var(--brand-dark);
+  display: inline-flex;
+  font-weight: 900;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  width: fit-content;
+}
+
+.admin-student-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-student-row {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 58px;
+  padding: 10px 12px;
+}
+
+.admin-student-identity {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-student-identity span {
+  align-items: center;
+  color: var(--ink);
+  display: inline-flex;
+  font-weight: 900;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-student-identity small {
+  color: var(--muted);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.admin-student-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.admin-student-actions button,
+.admin-student-edit-form button {
+  align-items: center;
+  border: 0;
+  border-radius: 8px;
+  display: inline-flex;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+
+.admin-student-actions button,
+.admin-student-edit-form button.secondary {
+  background: #eef2ff;
+  color: var(--brand-dark);
+}
+
+.admin-student-actions button.danger {
+  background: #fee2e2;
+  color: var(--danger);
+}
+
+.admin-student-edit-form {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(210px, 1fr) minmax(220px, 1fr) 36px 36px;
+  padding: 12px;
+}
+
+.admin-student-edit-form input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 36px;
+  min-width: 0;
+  padding: 0 10px;
+}
+
+.admin-student-edit-form button[type="submit"] {
+  background: var(--success);
+  color: #ffffff;
+}
+
+.admin-student-actions button:disabled,
+.admin-student-edit-form button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .admin-unit-list {
   display: grid;
   gap: 12px;
@@ -1469,8 +1569,14 @@ h2 {
 
 .admin-unit-heading {
   align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
   display: flex;
   justify-content: space-between;
+  padding: 0;
+  text-align: left;
+  width: 100%;
 }
 
 .admin-unit-heading strong,
@@ -1611,6 +1717,22 @@ h2 {
   justify-content: space-between;
 }
 
+.admin-topic-toggle {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  display: inline-flex;
+  flex: 1;
+  font-weight: 900;
+  gap: 8px;
+  justify-content: space-between;
+  min-height: 36px;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+}
+
 .admin-topic-title-row button,
 .admin-topic-edit-form button {
   align-items: center;
@@ -1622,7 +1744,7 @@ h2 {
   width: 36px;
 }
 
-.admin-topic-title-row button {
+.admin-topic-title-row > button:not(.admin-topic-toggle) {
   background: #eef2ff;
   color: var(--brand-dark);
 }
@@ -1805,7 +1927,10 @@ h2 {
   .admin-header,
   .admin-email-form > div,
   .admin-pdf-form,
+  .admin-student-edit-form,
+  .admin-student-form,
   .admin-subtopic-form {
     display: grid;
+    grid-template-columns: 1fr;
   }
 }
