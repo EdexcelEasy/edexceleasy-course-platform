@@ -2,17 +2,14 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LogIn, ShieldCheck, UserRound } from "lucide-react";
-
-const ADMIN_EMAIL = "admin@edexceleasy.com";
-const ADMIN_PASSWORD = "admin123";
+import { LogIn } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"student" | "admin">("student");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const currentRole = window.localStorage.getItem("edexcel-auth-role");
@@ -20,30 +17,48 @@ export default function LoginPage() {
     if (currentRole === "student") router.replace("/dashboard");
   }, [router]);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const normalizedEmail = email.trim().toLowerCase();
 
-    if (!normalizedEmail || !password) {
+    if (!normalizedEmail || !password.trim()) {
       setError("Enter your email and password.");
       return;
     }
 
-    if (role === "admin") {
-      if (normalizedEmail !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
-        setError("Admin email or password is incorrect.");
-        return;
+    setIsSubmitting(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/auth/resolve-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail, password })
+      });
+      const data = (await response.json()) as {
+        email?: string;
+        fullName?: string | null;
+        role?: "admin" | "student";
+        error?: string;
+      };
+
+      if (!response.ok || !data.role || !data.email) {
+        throw new Error(data.error ?? "Unable to login.");
       }
 
-      window.localStorage.setItem("edexcel-auth-role", "admin");
-      window.localStorage.setItem("edexcel-auth-email", normalizedEmail);
-      router.push("/admin");
-      return;
+      window.localStorage.setItem("edexcel-auth-role", data.role);
+      window.localStorage.setItem("edexcel-auth-email", data.email);
+      if (data.fullName) {
+        window.localStorage.setItem("edexcel-auth-name", data.fullName);
+      } else {
+        window.localStorage.removeItem("edexcel-auth-name");
+      }
+      router.push(data.role === "admin" ? "/admin" : "/dashboard");
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Unable to login.");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    window.localStorage.setItem("edexcel-auth-role", "student");
-    window.localStorage.setItem("edexcel-auth-email", normalizedEmail);
-    router.push("/dashboard");
   }
 
   return (
@@ -59,17 +74,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="role-switch" aria-label="Choose login type">
-          <button className={role === "student" ? "active" : ""} onClick={() => setRole("student")} type="button">
-            <UserRound size={17} aria-hidden="true" />
-            Student
-          </button>
-          <button className={role === "admin" ? "active" : ""} onClick={() => setRole("admin")} type="button">
-            <ShieldCheck size={17} aria-hidden="true" />
-            Admin
-          </button>
-        </div>
-
         <form className="login-form" onSubmit={handleSubmit}>
           <label>
             Email
@@ -79,7 +83,7 @@ export default function LoginPage() {
                 setEmail(event.target.value);
                 setError("");
               }}
-              placeholder={role === "admin" ? ADMIN_EMAIL : "student@gmail.com"}
+              placeholder="you@example.com"
               type="email"
             />
           </label>
@@ -92,16 +96,16 @@ export default function LoginPage() {
                 setPassword(event.target.value);
                 setError("");
               }}
-              placeholder={role === "admin" ? "admin123" : "Enter password"}
+              placeholder="Enter password"
               type="password"
             />
           </label>
 
           {error && <p className="login-error">{error}</p>}
 
-          <button className="login-submit" type="submit">
+          <button className="login-submit" disabled={isSubmitting} type="submit">
             <LogIn size={18} aria-hidden="true" />
-            Login
+            {isSubmitting ? "Checking..." : "Login"}
           </button>
         </form>
       </section>

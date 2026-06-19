@@ -82,6 +82,7 @@ create table if not exists public.admin_pdf_access (
 create table if not exists public.app_user_roles (
   email text primary key,
   role text not null check (role in ('admin', 'student')),
+  password_hash text not null,
   full_name text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
