@@ -346,6 +346,10 @@ button {
   width: 11px;
 }
 
+.subject-dot.pdf-dot {
+  background: #38bdf8;
+}
+
 .topic-list {
   border-left: 1px solid rgba(255, 255, 255, 0.14);
   display: grid;
@@ -647,6 +651,7 @@ h2 {
 .unit-topic-player {
   background: #ffffff;
   border-top: 1px solid var(--line);
+  position: relative;
 }
 
 .unit-topic-player iframe {
@@ -655,6 +660,57 @@ h2 {
   display: block;
   min-height: 360px;
   width: 100%;
+}
+
+.unit-topic-player:fullscreen,
+.pdf-viewer:fullscreen {
+  background: #000000;
+  display: grid;
+  height: 100vh;
+  width: 100vw;
+}
+
+.unit-topic-player:fullscreen iframe,
+.pdf-viewer:fullscreen iframe {
+  height: 100vh;
+  min-height: 0;
+  width: 100vw;
+}
+
+.viewer-fullscreen-button {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  color: #ffffff;
+  display: inline-flex;
+  gap: 7px;
+  height: 36px;
+  justify-content: center;
+  min-width: 36px;
+  padding: 0 10px;
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: auto;
+  z-index: 20;
+}
+
+.viewer-fullscreen-button:hover {
+  background: rgba(37, 99, 235, 0.92);
+}
+
+.viewer-fullscreen-label {
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.unit-topic-player:fullscreen .viewer-fullscreen-button,
+.pdf-viewer:fullscreen .viewer-fullscreen-button {
+  position: fixed;
+  right: 18px;
+  top: 18px;
 }
 
 .unit-subtopic-list {
@@ -729,6 +785,35 @@ h2 {
   overflow: hidden;
 }
 
+.pdf-subject-group {
+  border-bottom: 1px solid var(--line);
+  display: grid;
+}
+
+.pdf-subject-group:last-child {
+  border-bottom: 0;
+}
+
+.pdf-subject-heading {
+  align-items: center;
+  background: #eef4ff;
+  color: var(--brand-dark);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 18px 1fr auto;
+  min-height: 48px;
+  padding: 0 16px;
+}
+
+.pdf-subject-heading span {
+  font-weight: 900;
+}
+
+.pdf-subject-heading strong {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .pdf-item {
   border-bottom: 1px solid var(--line);
   display: grid;
@@ -765,6 +850,7 @@ h2 {
   background: #ffffff;
   border-top: 1px solid var(--line);
   overflow: hidden;
+  position: relative;
 }
 
 .pdf-viewer iframe {
@@ -1122,6 +1208,7 @@ h2 {
 }
 
 .admin-content {
+  align-content: start;
   display: grid;
   gap: 20px;
   padding: 32px;
@@ -1235,10 +1322,18 @@ h2 {
 .admin-pdf-form {
   display: grid;
   gap: 10px;
-  grid-template-columns: minmax(160px, 0.8fr) minmax(220px, 1.2fr) 132px;
+  grid-template-columns: minmax(160px, 0.85fr) minmax(220px, 1.2fr) 132px;
 }
 
-.admin-pdf-form input {
+.admin-pdf-subject-form {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 150px;
+}
+
+.admin-pdf-form input,
+.admin-pdf-form select,
+.admin-pdf-subject-form input {
   border: 1px solid var(--line);
   border-radius: 8px;
   min-height: 44px;
@@ -1246,7 +1341,8 @@ h2 {
   padding: 0 12px;
 }
 
-.admin-pdf-form button {
+.admin-pdf-form button,
+.admin-pdf-subject-form button {
   align-items: center;
   background: var(--brand);
   border: 0;
@@ -1261,7 +1357,8 @@ h2 {
   white-space: nowrap;
 }
 
-.admin-pdf-form button:disabled {
+.admin-pdf-form button:disabled,
+.admin-pdf-subject-form button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
 }

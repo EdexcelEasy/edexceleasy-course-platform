@@ -33,7 +33,14 @@ export type PdfResource = {
   id: string;
   title: string;
   driveUrl: string;
+  pdfSubjectId?: string | null;
+  pdfSubjectName?: string;
   allowedEmails?: string[];
+};
+
+export type PdfSubject = {
+  id: string;
+  name: string;
 };
 
 export type Lesson = {

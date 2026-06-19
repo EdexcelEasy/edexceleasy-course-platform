@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { addPdfResource, getPdfResources } from "@/lib/server/admin-store";
+import { addPdfSubject, getPdfSubjects } from "@/lib/server/admin-store";
 
 export async function GET() {
   try {
-    const pdfs = await getPdfResources();
-    return NextResponse.json({ pdfs });
+    const pdfSubjects = await getPdfSubjects();
+    return NextResponse.json({ pdfSubjects });
   } catch (error) {
     return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }
@@ -12,10 +12,10 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { title?: string; driveUrl?: string; pdfSubjectId?: string };
-    const pdfs = await addPdfResource(body.title ?? "", body.driveUrl ?? "", body.pdfSubjectId ?? "");
+    const body = (await request.json()) as { name?: string };
+    const pdfSubjects = await addPdfSubject(body.name ?? "");
 
-    return NextResponse.json({ pdfs });
+    return NextResponse.json({ pdfSubjects });
   } catch (error) {
     return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }

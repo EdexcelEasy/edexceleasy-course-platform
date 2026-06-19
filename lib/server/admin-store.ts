@@ -4,6 +4,7 @@ import {
   type CourseTopic,
   type CourseUnit,
   type PdfResource,
+  type PdfSubject,
   type Subject
 } from "@/lib/lessons";
 import type { Database } from "@/lib/supabase/database.types";
@@ -49,6 +50,13 @@ type PdfResourceRow = {
   id: string;
   title: string;
   drive_url: string;
+  pdf_subject_id?: string | null;
+  display_order: number;
+};
+
+type PdfSubjectRow = {
+  id: string;
+  name: string;
   display_order: number;
 };
 
@@ -81,20 +89,55 @@ export async function getAdminSubjects() {
 }
 
 export async function getPdfResources() {
-  const pdfs = await runQuery(getSupabase().from("admin_pdfs").select("*").order("display_order", { ascending: true }));
+  const [pdfs, pdfSubjects] = await Promise.all([
+    runQuery(getSupabase().from("admin_pdfs").select("*").order("display_order", { ascending: true })),
+    runOptionalQuery(getSupabase().from("admin_pdf_subjects").select("*").order("display_order", { ascending: true }))
+  ]);
   const pdfAccess = await runOptionalQuery(
     getSupabase().from("admin_pdf_access").select("pdf_id,email").order("email", { ascending: true })
   );
   const accessByPdf = groupAccessByOwner(pdfAccess.data ?? [], "pdf_id");
+  const subjectNames = new Map(((pdfSubjects.data ?? []) as PdfSubjectRow[]).map((subject) => [subject.id, subject.name]));
 
-  return ((pdfs.data ?? []) as PdfResourceRow[]).map((row) => buildPdfResource(row, accessByPdf[row.id] ?? []));
+  return ((pdfs.data ?? []) as PdfResourceRow[]).map((row) =>
+    buildPdfResource(row, accessByPdf[row.id] ?? [], row.pdf_subject_id ? subjectNames.get(row.pdf_subject_id) : undefined)
+  );
 }
 
-export async function addPdfResource(title: string, driveUrl: string) {
+export async function getPdfSubjects() {
+  const result = await runOptionalQuery(
+    getSupabase().from("admin_pdf_subjects").select("*").order("display_order", { ascending: true })
+  );
+
+  return ((result.data ?? []) as PdfSubjectRow[]).map(buildPdfSubject);
+}
+
+export async function addPdfSubject(name: string) {
+  const trimmedName = name.trim();
+  const id = slugify(trimmedName);
+
+  if (!trimmedName) return getPdfSubjects();
+
+  const existingSubjects = await getPdfSubjects();
+  if (existingSubjects.some((subject) => subject.id === id)) return existingSubjects;
+
+  await runQuery(
+    getSupabase().from("admin_pdf_subjects").insert({
+      id,
+      name: trimmedName,
+      display_order: existingSubjects.length
+    })
+  );
+
+  return getPdfSubjects();
+}
+
+export async function addPdfResource(title: string, driveUrl: string, pdfSubjectId: string) {
   const trimmedTitle = title.trim();
   const trimmedDriveUrl = driveUrl.trim();
+  const trimmedPdfSubjectId = pdfSubjectId.trim();
 
-  if (!trimmedTitle || !trimmedDriveUrl) return getPdfResources();
+  if (!trimmedTitle || !trimmedDriveUrl || !trimmedPdfSubjectId) return getPdfResources();
 
   const pdfCount = await countRows("admin_pdfs");
 
@@ -103,6 +146,7 @@ export async function addPdfResource(title: string, driveUrl: string) {
       id: `${slugify(trimmedTitle)}-${Date.now()}`,
       title: trimmedTitle,
       drive_url: trimmedDriveUrl,
+      pdf_subject_id: trimmedPdfSubjectId,
       display_order: pdfCount
     })
   );
@@ -523,12 +567,21 @@ function buildTopic(topic: TopicRow, snapshot: StoreSnapshot): CourseTopic {
   };
 }
 
-function buildPdfResource(row: PdfResourceRow, allowedEmails: string[]): PdfResource {
+function buildPdfResource(row: PdfResourceRow, allowedEmails: string[], pdfSubjectName?: string): PdfResource {
   return {
     id: row.id,
     title: row.title,
     driveUrl: row.drive_url,
+    pdfSubjectId: row.pdf_subject_id ?? null,
+    pdfSubjectName: pdfSubjectName ?? "Unassigned",
     allowedEmails
+  };
+}
+
+function buildPdfSubject(row: PdfSubjectRow): PdfSubject {
+  return {
+    id: row.id,
+    name: row.name
   };
 }
 

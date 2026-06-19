@@ -12,9 +12,15 @@ import {
   Pencil,
   Plus,
   Trash2,
-  X
+  X,
 } from "lucide-react";
-import type { CourseTopic, CourseUnit, PdfResource, Subject } from "@/lib/lessons";
+import type {
+  CourseTopic,
+  CourseUnit,
+  PdfResource,
+  PdfSubject,
+  Subject,
+} from "@/lib/lessons";
 
 type AdminSection = "subjects" | "pdf";
 
@@ -23,20 +29,35 @@ export default function AdminPage() {
   const [activeSection, setActiveSection] = useState<AdminSection>("subjects");
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [pdfs, setPdfs] = useState<PdfResource[]>([]);
+  const [pdfSubjects, setPdfSubjects] = useState<PdfSubject[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
+  const [selectedPdfSubjectId, setSelectedPdfSubjectId] = useState("");
   const [subjectName, setSubjectName] = useState("");
-  const [pdfDraft, setPdfDraft] = useState({ title: "", driveUrl: "" });
-  const [pdfEmailDrafts, setPdfEmailDrafts] = useState<Record<string, string>>({});
+  const [pdfSubjectName, setPdfSubjectName] = useState("");
+  const [pdfDraft, setPdfDraft] = useState({
+    title: "",
+    driveUrl: "",
+    pdfSubjectId: "",
+  });
+  const [pdfEmailDrafts, setPdfEmailDrafts] = useState<Record<string, string>>(
+    {},
+  );
   const [unitTitle, setUnitTitle] = useState("");
   const [topicDrafts, setTopicDrafts] = useState<Record<string, string>>({});
   const [editingTopicId, setEditingTopicId] = useState("");
-  const [topicEditDrafts, setTopicEditDrafts] = useState<Record<string, string>>({});
-  const [subtopicDrafts, setSubtopicDrafts] = useState<Record<string, { title: string; driveUrl: string }>>({});
+  const [topicEditDrafts, setTopicEditDrafts] = useState<
+    Record<string, string>
+  >({});
+  const [subtopicDrafts, setSubtopicDrafts] = useState<
+    Record<string, { title: string; driveUrl: string }>
+  >({});
   const [editingSubtopicId, setEditingSubtopicId] = useState("");
   const [subtopicEditDrafts, setSubtopicEditDrafts] = useState<
     Record<string, { title: string; driveUrl: string }>
   >({});
-  const [unitEmailDrafts, setUnitEmailDrafts] = useState<Record<string, string>>({});
+  const [unitEmailDrafts, setUnitEmailDrafts] = useState<
+    Record<string, string>
+  >({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -49,11 +70,25 @@ export default function AdminPage() {
 
     void loadSubjects();
     void loadPdfs();
+    void loadPdfSubjects();
   }, [router]);
 
   const selectedSubject = useMemo(
-    () => subjects.find((subject) => subject.id === selectedSubjectId) ?? subjects[0],
-    [selectedSubjectId, subjects]
+    () =>
+      subjects.find((subject) => subject.id === selectedSubjectId) ??
+      subjects[0],
+    [selectedSubjectId, subjects],
+  );
+  const selectedPdfSubject = useMemo(
+    () =>
+      pdfSubjects.find((subject) => subject.id === selectedPdfSubjectId) ??
+      pdfSubjects[0],
+    [pdfSubjects, selectedPdfSubjectId],
+  );
+  const selectedPdfSubjectPdfs = useMemo(
+    () =>
+      pdfs.filter((pdf) => (pdf.pdfSubjectId ?? "") === selectedPdfSubject?.id),
+    [pdfs, selectedPdfSubject],
   );
 
   async function loadSubjects(showLoading = true, preferredSubjectId?: string) {
@@ -61,22 +96,36 @@ export default function AdminPage() {
     setLoadError("");
 
     try {
-      const data = await readSubjectsResponse(await fetch("/api/admin/subjects", { cache: "no-store" }));
+      const data = await readSubjectsResponse(
+        await fetch("/api/admin/subjects", { cache: "no-store" }),
+      );
       setSubjects(data.subjects);
-      setSelectedSubjectId((current) => preferredSubjectId || current || data.subjects[0]?.id || "");
+      setSelectedSubjectId(
+        (current) =>
+          preferredSubjectId || current || data.subjects[0]?.id || "",
+      );
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : "Unable to load subjects.");
+      setLoadError(
+        error instanceof Error ? error.message : "Unable to load subjects.",
+      );
       setSubjects([]);
     } finally {
       if (showLoading) setIsLoading(false);
     }
   }
 
-  function applySubjects(data: { subjects: Subject[] }, preferredSubjectId?: string) {
+  function applySubjects(
+    data: { subjects: Subject[] },
+    preferredSubjectId?: string,
+  ) {
     setSubjects(data.subjects);
     setSelectedSubjectId((current) => {
       const nextSubjectId = preferredSubjectId ?? current;
-      if (nextSubjectId && data.subjects.some((subject) => subject.id === nextSubjectId)) return nextSubjectId;
+      if (
+        nextSubjectId &&
+        data.subjects.some((subject) => subject.id === nextSubjectId)
+      )
+        return nextSubjectId;
 
       return data.subjects[0]?.id ?? "";
     });
@@ -84,10 +133,34 @@ export default function AdminPage() {
 
   async function loadPdfs() {
     try {
-      const data = await readPdfsResponse(await fetch("/api/admin/pdfs", { cache: "no-store" }));
+      const data = await readPdfsResponse(
+        await fetch("/api/admin/pdfs", { cache: "no-store" }),
+      );
       setPdfs(data.pdfs);
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : "Unable to load PDFs.");
+      setLoadError(
+        error instanceof Error ? error.message : "Unable to load PDFs.",
+      );
+    }
+  }
+
+  async function loadPdfSubjects() {
+    try {
+      const data = await readPdfSubjectsResponse(
+        await fetch("/api/admin/pdf-subjects", { cache: "no-store" }),
+      );
+      setPdfSubjects(data.pdfSubjects);
+      setSelectedPdfSubjectId(
+        (current) => current || data.pdfSubjects[0]?.id || "",
+      );
+      setPdfDraft((current) => ({
+        ...current,
+        pdfSubjectId: current.pdfSubjectId || data.pdfSubjects[0]?.id || "",
+      }));
+    } catch (error) {
+      setLoadError(
+        error instanceof Error ? error.message : "Unable to load PDF subjects.",
+      );
     }
   }
 
@@ -99,28 +172,72 @@ export default function AdminPage() {
     const response = await fetch("/api/admin/subjects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: subjectName })
+      body: JSON.stringify({ name: subjectName }),
     });
     const data = await readSubjectsResponse(response);
     const newSubjectId = slugify(subjectName);
-    applySubjects(data, data.subjects.some((subject) => subject.id === newSubjectId) ? newSubjectId : selectedSubjectId);
+    applySubjects(
+      data,
+      data.subjects.some((subject) => subject.id === newSubjectId)
+        ? newSubjectId
+        : selectedSubjectId,
+    );
     setSubjectName("");
     setIsSaving(false);
   }
 
   async function handleAddPdf(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!pdfDraft.title.trim() || !pdfDraft.driveUrl.trim()) return;
+    if (
+      !pdfDraft.title.trim() ||
+      !pdfDraft.driveUrl.trim() ||
+      !pdfDraft.pdfSubjectId
+    )
+      return;
 
     setIsSaving(true);
     const response = await fetch("/api/admin/pdfs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(pdfDraft)
+      body: JSON.stringify(pdfDraft),
     });
     const data = await readPdfsResponse(response);
     setPdfs(data.pdfs);
-    setPdfDraft({ title: "", driveUrl: "" });
+    setPdfDraft((current) => ({
+      title: "",
+      driveUrl: "",
+      pdfSubjectId: current.pdfSubjectId,
+    }));
+    setIsSaving(false);
+  }
+
+  async function handleAddPdfSubject(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!pdfSubjectName.trim()) return;
+
+    setIsSaving(true);
+    const response = await fetch("/api/admin/pdf-subjects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: pdfSubjectName }),
+    });
+    const data = await readPdfSubjectsResponse(response);
+    setPdfSubjects(data.pdfSubjects);
+    const newSubjectId = slugify(pdfSubjectName);
+    setSelectedPdfSubjectId(
+      data.pdfSubjects.some((subject) => subject.id === newSubjectId)
+        ? newSubjectId
+        : (data.pdfSubjects[0]?.id ?? ""),
+    );
+    setPdfDraft((current) => ({
+      ...current,
+      pdfSubjectId: data.pdfSubjects.some(
+        (subject) => subject.id === newSubjectId,
+      )
+        ? newSubjectId
+        : current.pdfSubjectId || data.pdfSubjects[0]?.id || "",
+    }));
+    setPdfSubjectName("");
     setIsSaving(false);
   }
 
@@ -129,14 +246,17 @@ export default function AdminPage() {
 
     setIsSaving(true);
     const response = await fetch(`/api/admin/pdfs/${pdfId}`, {
-      method: "DELETE"
+      method: "DELETE",
     });
     const data = await readPdfsResponse(response);
     setPdfs(data.pdfs);
     setIsSaving(false);
   }
 
-  async function handleAddPdfEmail(event: FormEvent<HTMLFormElement>, pdfId: string) {
+  async function handleAddPdfEmail(
+    event: FormEvent<HTMLFormElement>,
+    pdfId: string,
+  ) {
     event.preventDefault();
     if (!pdfEmailDrafts[pdfId]?.trim()) return;
 
@@ -144,7 +264,7 @@ export default function AdminPage() {
     const response = await fetch(`/api/admin/pdfs/${pdfId}/access`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: pdfEmailDrafts[pdfId] })
+      body: JSON.stringify({ email: pdfEmailDrafts[pdfId] }),
     });
     const data = await readPdfsResponse(response);
     setPdfs(data.pdfs);
@@ -157,7 +277,7 @@ export default function AdminPage() {
     const response = await fetch(`/api/admin/pdfs/${pdfId}/access`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email })
+      body: JSON.stringify({ email }),
     });
     const data = await readPdfsResponse(response);
     setPdfs(data.pdfs);
@@ -169,78 +289,112 @@ export default function AdminPage() {
     if (!selectedSubject || !unitTitle.trim()) return;
 
     setIsSaving(true);
-    const response = await fetch(`/api/admin/subjects/${selectedSubject.id}/units`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: unitTitle })
-    });
+    const response = await fetch(
+      `/api/admin/subjects/${selectedSubject.id}/units`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: unitTitle }),
+      },
+    );
     applySubjects(await readSubjectsResponse(response), selectedSubject.id);
     setUnitTitle("");
     setIsSaving(false);
   }
 
-  async function handleAddTopic(event: FormEvent<HTMLFormElement>, unitId: string) {
+  async function handleAddTopic(
+    event: FormEvent<HTMLFormElement>,
+    unitId: string,
+  ) {
     event.preventDefault();
     if (!selectedSubject || !topicDrafts[unitId]?.trim()) return;
 
     setIsSaving(true);
-    const response = await fetch(`/api/admin/subjects/${selectedSubject.id}/units/${unitId}/topics`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic: topicDrafts[unitId] })
-    });
+    const response = await fetch(
+      `/api/admin/subjects/${selectedSubject.id}/units/${unitId}/topics`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: topicDrafts[unitId] }),
+      },
+    );
     applySubjects(await readSubjectsResponse(response), selectedSubject.id);
     setTopicDrafts((current) => ({ ...current, [unitId]: "" }));
     setIsSaving(false);
   }
 
-  async function handleUpdateTopic(event: FormEvent<HTMLFormElement>, unitId: string, topicId: string) {
+  async function handleUpdateTopic(
+    event: FormEvent<HTMLFormElement>,
+    unitId: string,
+    topicId: string,
+  ) {
     event.preventDefault();
     const title = topicEditDrafts[topicId]?.trim();
     if (!selectedSubject || !title) return;
 
     setIsSaving(true);
-    const response = await fetch(`/api/admin/subjects/${selectedSubject.id}/units/${unitId}/topics/${topicId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title })
-    });
+    const response = await fetch(
+      `/api/admin/subjects/${selectedSubject.id}/units/${unitId}/topics/${topicId}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      },
+    );
     applySubjects(await readSubjectsResponse(response), selectedSubject.id);
     setEditingTopicId("");
     setTopicEditDrafts((current) => ({ ...current, [topicId]: "" }));
     setIsSaving(false);
   }
 
-  async function handleAddUnitEmail(event: FormEvent<HTMLFormElement>, unitId: string) {
+  async function handleAddUnitEmail(
+    event: FormEvent<HTMLFormElement>,
+    unitId: string,
+  ) {
     event.preventDefault();
     if (!selectedSubject || !unitEmailDrafts[unitId]?.trim()) return;
 
     setIsSaving(true);
-    const response = await fetch(`/api/admin/subjects/${selectedSubject.id}/units/${unitId}/access`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: unitEmailDrafts[unitId] })
-    });
+    const response = await fetch(
+      `/api/admin/subjects/${selectedSubject.id}/units/${unitId}/access`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: unitEmailDrafts[unitId] }),
+      },
+    );
     applySubjects(await readSubjectsResponse(response), selectedSubject.id);
     setUnitEmailDrafts((current) => ({ ...current, [unitId]: "" }));
     setIsSaving(false);
   }
 
-  async function handleRemoveUnitEmail(subjectId: string, unitId: string, emailToRemove: string) {
+  async function handleRemoveUnitEmail(
+    subjectId: string,
+    unitId: string,
+    emailToRemove: string,
+  ) {
     setIsSaving(true);
-    const response = await fetch(`/api/admin/subjects/${subjectId}/units/${unitId}/access`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: emailToRemove })
-    });
+    const response = await fetch(
+      `/api/admin/subjects/${subjectId}/units/${unitId}/access`,
+      {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailToRemove }),
+      },
+    );
     applySubjects(await readSubjectsResponse(response), subjectId);
     setIsSaving(false);
   }
 
-  async function handleAddSubtopic(event: FormEvent<HTMLFormElement>, unitId: string, topicId: string) {
+  async function handleAddSubtopic(
+    event: FormEvent<HTMLFormElement>,
+    unitId: string,
+    topicId: string,
+  ) {
     event.preventDefault();
     const draft = subtopicDrafts[topicId];
-    if (!selectedSubject || !draft?.title.trim() || !draft.driveUrl.trim()) return;
+    if (!selectedSubject || !draft?.title.trim() || !draft.driveUrl.trim())
+      return;
 
     setIsSaving(true);
     const response = await fetch(
@@ -248,11 +402,14 @@ export default function AdminPage() {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft)
-      }
+        body: JSON.stringify(draft),
+      },
     );
     applySubjects(await readSubjectsResponse(response), selectedSubject.id);
-    setSubtopicDrafts((current) => ({ ...current, [topicId]: { title: "", driveUrl: "" } }));
+    setSubtopicDrafts((current) => ({
+      ...current,
+      [topicId]: { title: "", driveUrl: "" },
+    }));
     setIsSaving(false);
   }
 
@@ -260,11 +417,12 @@ export default function AdminPage() {
     event: FormEvent<HTMLFormElement>,
     unitId: string,
     topicId: string,
-    subtopicId: string
+    subtopicId: string,
   ) {
     event.preventDefault();
     const draft = subtopicEditDrafts[subtopicId];
-    if (!selectedSubject || !draft?.title.trim() || !draft.driveUrl.trim()) return;
+    if (!selectedSubject || !draft?.title.trim() || !draft.driveUrl.trim())
+      return;
 
     setIsSaving(true);
     const response = await fetch(
@@ -272,16 +430,24 @@ export default function AdminPage() {
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft)
-      }
+        body: JSON.stringify(draft),
+      },
     );
     applySubjects(await readSubjectsResponse(response), selectedSubject.id);
     setEditingSubtopicId("");
-    setSubtopicEditDrafts((current) => ({ ...current, [subtopicId]: { title: "", driveUrl: "" } }));
+    setSubtopicEditDrafts((current) => ({
+      ...current,
+      [subtopicId]: { title: "", driveUrl: "" },
+    }));
     setIsSaving(false);
   }
 
-  async function handleDeleteSubtopic(unitId: string, topicId: string, subtopicId: string, subtopicTitle: string) {
+  async function handleDeleteSubtopic(
+    unitId: string,
+    topicId: string,
+    subtopicId: string,
+    subtopicTitle: string,
+  ) {
     if (!selectedSubject) return;
     if (!window.confirm(`Delete ${subtopicTitle}?`)) return;
 
@@ -289,8 +455,8 @@ export default function AdminPage() {
     const response = await fetch(
       `/api/admin/subjects/${selectedSubject.id}/units/${unitId}/topics/${topicId}/subtopics/${subtopicId}`,
       {
-        method: "DELETE"
-      }
+        method: "DELETE",
+      },
     );
     applySubjects(await readSubjectsResponse(response), selectedSubject.id);
     setEditingSubtopicId((current) => (current === subtopicId ? "" : current));
@@ -298,15 +464,22 @@ export default function AdminPage() {
   }
 
   async function handleDeleteSubject(subjectId: string, subjectName: string) {
-    if (!window.confirm(`Delete ${subjectName}? This will also remove its units, topics, and unit access list.`)) return;
+    if (
+      !window.confirm(
+        `Delete ${subjectName}? This will also remove its units, topics, and unit access list.`,
+      )
+    )
+      return;
 
     setIsSaving(true);
     const response = await fetch(`/api/admin/subjects/${subjectId}`, {
-      method: "DELETE"
+      method: "DELETE",
     });
     const data = await readSubjectsResponse(response);
     const nextSubjectId =
-      selectedSubjectId === subjectId ? data.subjects[0]?.id ?? "" : selectedSubjectId;
+      selectedSubjectId === subjectId
+        ? (data.subjects[0]?.id ?? "")
+        : selectedSubjectId;
 
     applySubjects(data, nextSubjectId);
     setIsSaving(false);
@@ -366,7 +539,11 @@ export default function AdminPage() {
                   onChange={(event) => setSubjectName(event.target.value)}
                   placeholder="e.g. Chemistry"
                 />
-                <button type="submit" disabled={isSaving} title="Create subject">
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  title="Create subject"
+                >
                   <Plus size={17} aria-hidden="true" />
                 </button>
               </div>
@@ -376,21 +553,78 @@ export default function AdminPage() {
               {subjects.map((subject) => (
                 <div className="admin-subject-row" key={subject.id}>
                   <button
-                    className={selectedSubject?.id === subject.id ? "admin-subject-button active" : "admin-subject-button"}
+                    className={
+                      selectedSubject?.id === subject.id
+                        ? "admin-subject-button active"
+                        : "admin-subject-button"
+                    }
                     onClick={() => setSelectedSubjectId(subject.id)}
                     type="button"
                   >
-                    <span className="subject-dot" style={{ background: subject.color }} />
+                    <span
+                      className="subject-dot"
+                      style={{ background: subject.color }}
+                    />
                     <span>{subject.name}</span>
                   </button>
                   <button
                     className="admin-subject-delete"
                     disabled={isSaving}
-                    onClick={() => void handleDeleteSubject(subject.id, subject.name)}
+                    onClick={() =>
+                      void handleDeleteSubject(subject.id, subject.name)
+                    }
                     title={`Delete ${subject.name}`}
                     type="button"
                   >
                     <Trash2 size={15} aria-hidden="true" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {activeSection === "pdf" && (
+          <>
+            <form className="admin-sidebar-form" onSubmit={handleAddPdfSubject}>
+              <label htmlFor="pdfSubjectName">New PDF subject</label>
+              <div>
+                <input
+                  id="pdfSubjectName"
+                  value={pdfSubjectName}
+                  onChange={(event) => setPdfSubjectName(event.target.value)}
+                  placeholder="e.g. Formula sheets"
+                />
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  title="Create PDF subject"
+                >
+                  <Plus size={17} aria-hidden="true" />
+                </button>
+              </div>
+            </form>
+
+            <div className="admin-subject-list">
+              {pdfSubjects.map((subject) => (
+                <div className="admin-subject-row" key={subject.id}>
+                  <button
+                    className={
+                      selectedPdfSubject?.id === subject.id
+                        ? "admin-subject-button active"
+                        : "admin-subject-button"
+                    }
+                    onClick={() => {
+                      setSelectedPdfSubjectId(subject.id);
+                      setPdfDraft((current) => ({
+                        ...current,
+                        pdfSubjectId: subject.id,
+                      }));
+                    }}
+                    type="button"
+                  >
+                    <span className="subject-dot pdf-dot" />
+                    <span>{subject.name}</span>
                   </button>
                 </div>
               ))}
@@ -402,8 +636,10 @@ export default function AdminPage() {
       <section className="admin-content">
         <header className="admin-header">
           <div>
-            <p className="eyebrow">{activeSection === "pdf" ? "Resources" : "Permissions"}</p>
-            <h1>{activeSection === "pdf" ? "PDF library" : "Welcome admin"}</h1>
+            <p className="eyebrow">
+              {activeSection === "pdf" ? "Resources" : "Permissions"}
+            </p>
+            <h1>{activeSection === "pdf" ? "PDF library" : "Welcome Admin"}</h1>
           </div>
         </header>
 
@@ -411,21 +647,31 @@ export default function AdminPage() {
           <div className="admin-panel">
             <div className="admin-panel-heading">
               <div>
-                <p className="eyebrow">PDF</p>
+                <p className="eyebrow">{selectedPdfSubject?.name ?? "PDF"}</p>
                 <h2>Google Drive PDF resources</h2>
               </div>
-              <strong>{pdfs.length}</strong>
+              <strong>{selectedPdfSubjectPdfs.length}</strong>
             </div>
 
             <form className="admin-pdf-form" onSubmit={handleAddPdf}>
               <input
                 value={pdfDraft.title}
-                onChange={(event) => setPdfDraft((current) => ({ ...current, title: event.target.value }))}
+                onChange={(event) =>
+                  setPdfDraft((current) => ({
+                    ...current,
+                    title: event.target.value,
+                  }))
+                }
                 placeholder="PDF title"
               />
               <input
                 value={pdfDraft.driveUrl}
-                onChange={(event) => setPdfDraft((current) => ({ ...current, driveUrl: event.target.value }))}
+                onChange={(event) =>
+                  setPdfDraft((current) => ({
+                    ...current,
+                    driveUrl: event.target.value,
+                  }))
+                }
                 placeholder="Google Drive PDF link"
               />
               <button type="submit" disabled={isSaving}>
@@ -435,14 +681,17 @@ export default function AdminPage() {
             </form>
 
             <div className="admin-pdf-list">
-              {pdfs.map((pdf) => (
+              {selectedPdfSubjectPdfs.map((pdf) => (
                 <div className="admin-pdf-row" key={pdf.id}>
                   <div className="admin-pdf-main">
                     <span>
                       <FileText size={17} aria-hidden="true" />
                       {pdf.title}
                     </span>
-                    <small>{(pdf.allowedEmails ?? []).length} allowed students</small>
+                    <small>
+                      {pdf.pdfSubjectName ?? "Unassigned"} ·{" "}
+                      {(pdf.allowedEmails ?? []).length} allowed students
+                    </small>
                   </div>
                   <button
                     type="button"
@@ -452,11 +701,17 @@ export default function AdminPage() {
                   >
                     <Trash2 size={15} aria-hidden="true" />
                   </button>
-                  <form className="admin-pdf-access-form" onSubmit={(event) => void handleAddPdfEmail(event, pdf.id)}>
+                  <form
+                    className="admin-pdf-access-form"
+                    onSubmit={(event) => void handleAddPdfEmail(event, pdf.id)}
+                  >
                     <input
                       value={pdfEmailDrafts[pdf.id] ?? ""}
                       onChange={(event) =>
-                        setPdfEmailDrafts((current) => ({ ...current, [pdf.id]: event.target.value }))
+                        setPdfEmailDrafts((current) => ({
+                          ...current,
+                          [pdf.id]: event.target.value,
+                        }))
                       }
                       placeholder="Allow Gmail for this PDF"
                       type="email"
@@ -473,7 +728,9 @@ export default function AdminPage() {
                           <button
                             type="button"
                             disabled={isSaving}
-                            onClick={() => void handleRemovePdfEmail(pdf.id, allowedEmail)}
+                            onClick={() =>
+                              void handleRemovePdfEmail(pdf.id, allowedEmail)
+                            }
                           >
                             <Trash2 size={13} aria-hidden="true" />
                           </button>
@@ -484,10 +741,10 @@ export default function AdminPage() {
                 </div>
               ))}
 
-              {!pdfs.length && (
+              {!selectedPdfSubjectPdfs.length && (
                 <div className="admin-empty">
                   <FileText size={24} aria-hidden="true" />
-                  <strong>No PDFs yet</strong>
+                  <strong>No PDFs in this subject yet</strong>
                 </div>
               )}
             </div>
@@ -538,17 +795,26 @@ export default function AdminPage() {
                     <div>
                       <strong>{unit.title}</strong>
                       <span>
-                        {getUnitTopics(unit).length} topics · {(unit.allowedEmails ?? []).length} unit students
+                        {getUnitTopics(unit).length} topics ·{" "}
+                        {(unit.allowedEmails ?? []).length} unit students
                       </span>
                     </div>
                     <Layers3 size={18} aria-hidden="true" />
                   </div>
 
-                  <form className="admin-unit-access-form" onSubmit={(event) => void handleAddUnitEmail(event, unit.id)}>
+                  <form
+                    className="admin-unit-access-form"
+                    onSubmit={(event) =>
+                      void handleAddUnitEmail(event, unit.id)
+                    }
+                  >
                     <input
                       value={unitEmailDrafts[unit.id] ?? ""}
                       onChange={(event) =>
-                        setUnitEmailDrafts((current) => ({ ...current, [unit.id]: event.target.value }))
+                        setUnitEmailDrafts((current) => ({
+                          ...current,
+                          [unit.id]: event.target.value,
+                        }))
                       }
                       placeholder="Allow Gmail for this unit"
                       type="email"
@@ -566,7 +832,13 @@ export default function AdminPage() {
                           <button
                             type="button"
                             disabled={isSaving}
-                            onClick={() => void handleRemoveUnitEmail(selectedSubject.id, unit.id, allowedEmail)}
+                            onClick={() =>
+                              void handleRemoveUnitEmail(
+                                selectedSubject.id,
+                                unit.id,
+                                allowedEmail,
+                              )
+                            }
                           >
                             <Trash2 size={13} aria-hidden="true" />
                           </button>
@@ -575,11 +847,17 @@ export default function AdminPage() {
                     </div>
                   )}
 
-                  <form className="admin-topic-form" onSubmit={(event) => void handleAddTopic(event, unit.id)}>
+                  <form
+                    className="admin-topic-form"
+                    onSubmit={(event) => void handleAddTopic(event, unit.id)}
+                  >
                     <input
                       value={topicDrafts[unit.id] ?? ""}
                       onChange={(event) =>
-                        setTopicDrafts((current) => ({ ...current, [unit.id]: event.target.value }))
+                        setTopicDrafts((current) => ({
+                          ...current,
+                          [unit.id]: event.target.value,
+                        }))
                       }
                       placeholder="Topic name"
                     />
@@ -590,23 +868,35 @@ export default function AdminPage() {
 
                   <div className="admin-topic-list">
                     {getUnitTopics(unit).map((topic) => {
-                      const draft = subtopicDrafts[topic.id] ?? { title: "", driveUrl: "" };
+                      const draft = subtopicDrafts[topic.id] ?? {
+                        title: "",
+                        driveUrl: "",
+                      };
 
                       return (
                         <div className="admin-topic-card" key={topic.id}>
                           {editingTopicId === topic.id ? (
                             <form
                               className="admin-topic-edit-form"
-                              onSubmit={(event) => void handleUpdateTopic(event, unit.id, topic.id)}
+                              onSubmit={(event) =>
+                                void handleUpdateTopic(event, unit.id, topic.id)
+                              }
                             >
                               <input
                                 value={topicEditDrafts[topic.id] ?? topic.title}
                                 onChange={(event) =>
-                                  setTopicEditDrafts((current) => ({ ...current, [topic.id]: event.target.value }))
+                                  setTopicEditDrafts((current) => ({
+                                    ...current,
+                                    [topic.id]: event.target.value,
+                                  }))
                                 }
                                 placeholder="Topic name"
                               />
-                              <button type="submit" disabled={isSaving} title="Save topic">
+                              <button
+                                type="submit"
+                                disabled={isSaving}
+                                title="Save topic"
+                              >
                                 <Check size={16} aria-hidden="true" />
                               </button>
                               <button
@@ -614,7 +904,10 @@ export default function AdminPage() {
                                 disabled={isSaving}
                                 onClick={() => {
                                   setEditingTopicId("");
-                                  setTopicEditDrafts((current) => ({ ...current, [topic.id]: topic.title }));
+                                  setTopicEditDrafts((current) => ({
+                                    ...current,
+                                    [topic.id]: topic.title,
+                                  }));
                                 }}
                                 title="Cancel edit"
                               >
@@ -629,7 +922,10 @@ export default function AdminPage() {
                                 disabled={isSaving}
                                 onClick={() => {
                                   setEditingTopicId(topic.id);
-                                  setTopicEditDrafts((current) => ({ ...current, [topic.id]: topic.title }));
+                                  setTopicEditDrafts((current) => ({
+                                    ...current,
+                                    [topic.id]: topic.title,
+                                  }));
                                 }}
                                 title="Edit topic"
                               >
@@ -640,14 +936,19 @@ export default function AdminPage() {
 
                           <form
                             className="admin-subtopic-form"
-                            onSubmit={(event) => void handleAddSubtopic(event, unit.id, topic.id)}
+                            onSubmit={(event) =>
+                              void handleAddSubtopic(event, unit.id, topic.id)
+                            }
                           >
                             <input
                               value={draft.title}
                               onChange={(event) =>
                                 setSubtopicDrafts((current) => ({
                                   ...current,
-                                  [topic.id]: { ...draft, title: event.target.value }
+                                  [topic.id]: {
+                                    ...draft,
+                                    title: event.target.value,
+                                  },
                                 }))
                               }
                               placeholder="Subtopic title"
@@ -657,7 +958,10 @@ export default function AdminPage() {
                               onChange={(event) =>
                                 setSubtopicDrafts((current) => ({
                                   ...current,
-                                  [topic.id]: { ...draft, driveUrl: event.target.value }
+                                  [topic.id]: {
+                                    ...draft,
+                                    driveUrl: event.target.value,
+                                  },
                                 }))
                               }
                               placeholder="Google Drive link"
@@ -669,9 +973,11 @@ export default function AdminPage() {
 
                           <div className="admin-subtopic-list">
                             {topic.subtopics.map((subtopic) => {
-                              const editDraft = subtopicEditDrafts[subtopic.id] ?? {
+                              const editDraft = subtopicEditDrafts[
+                                subtopic.id
+                              ] ?? {
                                 title: subtopic.title,
-                                driveUrl: subtopic.driveUrl
+                                driveUrl: subtopic.driveUrl,
                               };
 
                               if (editingSubtopicId === subtopic.id) {
@@ -680,7 +986,12 @@ export default function AdminPage() {
                                     className="admin-subtopic-edit-form"
                                     key={subtopic.id}
                                     onSubmit={(event) =>
-                                      void handleUpdateSubtopic(event, unit.id, topic.id, subtopic.id)
+                                      void handleUpdateSubtopic(
+                                        event,
+                                        unit.id,
+                                        topic.id,
+                                        subtopic.id,
+                                      )
                                     }
                                   >
                                     <input
@@ -688,7 +999,10 @@ export default function AdminPage() {
                                       onChange={(event) =>
                                         setSubtopicEditDrafts((current) => ({
                                           ...current,
-                                          [subtopic.id]: { ...editDraft, title: event.target.value }
+                                          [subtopic.id]: {
+                                            ...editDraft,
+                                            title: event.target.value,
+                                          },
                                         }))
                                       }
                                       placeholder="Subtopic title"
@@ -698,12 +1012,19 @@ export default function AdminPage() {
                                       onChange={(event) =>
                                         setSubtopicEditDrafts((current) => ({
                                           ...current,
-                                          [subtopic.id]: { ...editDraft, driveUrl: event.target.value }
+                                          [subtopic.id]: {
+                                            ...editDraft,
+                                            driveUrl: event.target.value,
+                                          },
                                         }))
                                       }
                                       placeholder="Google Drive link"
                                     />
-                                    <button type="submit" disabled={isSaving} title="Save subtopic">
+                                    <button
+                                      type="submit"
+                                      disabled={isSaving}
+                                      title="Save subtopic"
+                                    >
                                       <Check size={16} aria-hidden="true" />
                                     </button>
                                     <button
@@ -715,8 +1036,8 @@ export default function AdminPage() {
                                           ...current,
                                           [subtopic.id]: {
                                             title: subtopic.title,
-                                            driveUrl: subtopic.driveUrl
-                                          }
+                                            driveUrl: subtopic.driveUrl,
+                                          },
                                         }));
                                       }}
                                       title="Cancel edit"
@@ -728,7 +1049,10 @@ export default function AdminPage() {
                               }
 
                               return (
-                                <div className="admin-subtopic-row" key={subtopic.id}>
+                                <div
+                                  className="admin-subtopic-row"
+                                  key={subtopic.id}
+                                >
                                   <span>{subtopic.title}</span>
                                   <button
                                     type="button"
@@ -739,8 +1063,8 @@ export default function AdminPage() {
                                         ...current,
                                         [subtopic.id]: {
                                           title: subtopic.title,
-                                          driveUrl: subtopic.driveUrl
-                                        }
+                                          driveUrl: subtopic.driveUrl,
+                                        },
                                       }));
                                     }}
                                     title="Edit subtopic"
@@ -752,7 +1076,12 @@ export default function AdminPage() {
                                     type="button"
                                     disabled={isSaving}
                                     onClick={() =>
-                                      void handleDeleteSubtopic(unit.id, topic.id, subtopic.id, subtopic.title)
+                                      void handleDeleteSubtopic(
+                                        unit.id,
+                                        topic.id,
+                                        subtopic.id,
+                                        subtopic.title,
+                                      )
                                     }
                                     title="Delete subtopic"
                                   >
@@ -761,7 +1090,9 @@ export default function AdminPage() {
                                 </div>
                               );
                             })}
-                            {!topic.subtopics.length && <em>No subtopics yet</em>}
+                            {!topic.subtopics.length && (
+                              <em>No subtopics yet</em>
+                            )}
                           </div>
                         </div>
                       );
@@ -791,7 +1122,7 @@ function getUnitTopics(unit: CourseUnit): CourseTopic[] {
   return unit.topics.map((topic) => ({
     id: `${unit.id}-${slugify(topic)}`,
     title: topic,
-    subtopics: []
+    subtopics: [],
   }));
 }
 
@@ -805,10 +1136,14 @@ function slugify(value: string) {
 
 async function readSubjectsResponse(response: Response) {
   const text = await response.text();
-  const data = text ? (JSON.parse(text) as { subjects?: Subject[]; error?: string }) : {};
+  const data = text
+    ? (JSON.parse(text) as { subjects?: Subject[]; error?: string })
+    : {};
 
   if (!response.ok) {
-    throw new Error(data.error ?? `Request failed with status ${response.status}.`);
+    throw new Error(
+      data.error ?? `Request failed with status ${response.status}.`,
+    );
   }
 
   return { subjects: data.subjects ?? [] };
@@ -816,11 +1151,30 @@ async function readSubjectsResponse(response: Response) {
 
 async function readPdfsResponse(response: Response) {
   const text = await response.text();
-  const data = text ? (JSON.parse(text) as { pdfs?: PdfResource[]; error?: string }) : {};
+  const data = text
+    ? (JSON.parse(text) as { pdfs?: PdfResource[]; error?: string })
+    : {};
 
   if (!response.ok) {
-    throw new Error(data.error ?? `Request failed with status ${response.status}.`);
+    throw new Error(
+      data.error ?? `Request failed with status ${response.status}.`,
+    );
   }
 
   return { pdfs: data.pdfs ?? [] };
+}
+
+async function readPdfSubjectsResponse(response: Response) {
+  const text = await response.text();
+  const data = text
+    ? (JSON.parse(text) as { pdfSubjects?: PdfSubject[]; error?: string })
+    : {};
+
+  if (!response.ok) {
+    throw new Error(
+      data.error ?? `Request failed with status ${response.status}.`,
+    );
+  }
+
+  return { pdfSubjects: data.pdfSubjects ?? [] };
 }

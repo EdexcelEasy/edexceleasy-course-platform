@@ -159,6 +159,7 @@ export type Database = {
       admin_pdfs: {
         Row: {
           id: string;
+          pdf_subject_id: string | null;
           title: string;
           drive_url: string;
           display_order: number;
@@ -167,6 +168,7 @@ export type Database = {
         };
         Insert: {
           id: string;
+          pdf_subject_id?: string | null;
           title: string;
           drive_url: string;
           display_order?: number;
@@ -175,8 +177,33 @@ export type Database = {
         };
         Update: {
           id?: string;
+          pdf_subject_id?: string | null;
           title?: string;
           drive_url?: string;
+          display_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      admin_pdf_subjects: {
+        Row: {
+          id: string;
+          name: string;
+          display_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          name: string;
+          display_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
           display_order?: number;
           created_at?: string;
           updated_at?: string;

@@ -54,8 +54,17 @@ create table if not exists public.admin_subtopics (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.admin_pdf_subjects (
+  id text primary key,
+  name text not null,
+  display_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.admin_pdfs (
   id text primary key,
+  pdf_subject_id text references public.admin_pdf_subjects(id) on delete set null,
   title text not null,
   drive_url text not null,
   display_order integer not null default 0,
@@ -113,6 +122,11 @@ create trigger set_admin_pdfs_updated_at
 before update on public.admin_pdfs
 for each row execute function public.set_updated_at();
 
+drop trigger if exists set_admin_pdf_subjects_updated_at on public.admin_pdf_subjects;
+create trigger set_admin_pdf_subjects_updated_at
+before update on public.admin_pdf_subjects
+for each row execute function public.set_updated_at();
+
 drop trigger if exists set_app_user_roles_updated_at on public.app_user_roles;
 create trigger set_app_user_roles_updated_at
 before update on public.app_user_roles
@@ -124,6 +138,7 @@ alter table public.admin_units enable row level security;
 alter table public.admin_unit_access enable row level security;
 alter table public.admin_topics enable row level security;
 alter table public.admin_subtopics enable row level security;
+alter table public.admin_pdf_subjects enable row level security;
 alter table public.admin_pdfs enable row level security;
 alter table public.admin_pdf_access enable row level security;
 alter table public.app_user_roles enable row level security;
