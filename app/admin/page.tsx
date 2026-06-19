@@ -12,7 +12,6 @@ import {
   Mail,
   Pencil,
   Plus,
-  ShieldCheck,
   Trash2,
   X
 } from "lucide-react";
@@ -338,12 +337,8 @@ export default function AdminPage() {
         <header className="admin-header">
           <div>
             <p className="eyebrow">Permissions</p>
-            <h1>Subject access by Gmail</h1>
+            <h1>Email name</h1>
           </div>
-          <span className="admin-status">
-            <ShieldCheck size={17} aria-hidden="true" />
-            Backend API
-          </span>
         </header>
 
         {isLoading ? (
