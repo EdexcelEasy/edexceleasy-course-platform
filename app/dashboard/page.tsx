@@ -5,8 +5,8 @@ import {
   ChevronDown,
   ChevronUp,
   Clock3,
+  FileText,
   Layers3,
-  Link,
   LogOut,
   Circle,
   Search,
@@ -22,22 +22,29 @@ import {
   type CourseTopic,
   type CourseUnit,
   type Lesson,
+  type PdfResource,
   type Subject
 } from "@/lib/lessons";
+
+type DashboardCategory = "subjects" | "pdf";
 
 export default function Home() {
   const router = useRouter();
   const [subjects, setSubjects] = useState<Subject[]>(subjectsSeed);
+  const [pdfs, setPdfs] = useState<PdfResource[]>([]);
   const lessons = lessonsSeed;
+  const [selectedCategory, setSelectedCategory] = useState<DashboardCategory>("subjects");
   const [selectedSubject, setSelectedSubject] = useState(subjectsSeed[0]?.id ?? "all");
   const [selectedTopic, setSelectedTopic] = useState("all");
   const [openCourseUnit, setOpenCourseUnit] = useState("ial-physics-unit-1");
   const [openTopicId, setOpenTopicId] = useState("");
   const [openSubtopicId, setOpenSubtopicId] = useState("");
   const [selectedLessonId, setSelectedLessonId] = useState(lessonsSeed[0]?.id ?? "");
+  const [selectedPdfId, setSelectedPdfId] = useState("");
   const [query, setQuery] = useState("");
   const [studentEmail, setStudentEmail] = useState("");
   const [isLoadingAccess, setIsLoadingAccess] = useState(true);
+  const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
 
   useEffect(() => {
     if (window.localStorage.getItem("edexcel-auth-role") !== "student") {
@@ -53,13 +60,21 @@ export default function Home() {
 
   async function loadStudentAccess(email: string) {
     setIsLoadingAccess(true);
-    const response = await fetch("/api/admin/subjects", { cache: "no-store" });
-    const data = (await response.json()) as { subjects: Subject[] };
+    const [subjectsResponse, pdfsResponse] = await Promise.all([
+      fetch("/api/admin/subjects", { cache: "no-store" }),
+      fetch("/api/admin/pdfs", { cache: "no-store" })
+    ]);
+    const data = (await subjectsResponse.json()) as { subjects: Subject[] };
+    const pdfData = (await pdfsResponse.json()) as { pdfs: PdfResource[] };
     const permittedSubjects = data.subjects
       .map((subject) => getPermittedSubject(subject, email))
       .filter((subject): subject is Subject => Boolean(subject));
+    const permittedPdfs = (pdfData.pdfs ?? []).filter((pdf) => (pdf.allowedEmails ?? []).includes(email));
 
     setSubjects(permittedSubjects);
+    setPdfs(permittedPdfs);
+    setSelectedPdfId(permittedPdfs[0]?.id ?? "");
+    setSelectedCategory("subjects");
     setSelectedSubject(permittedSubjects[0]?.id ?? "all");
     setSelectedTopic("all");
     setIsLoadingAccess(false);
@@ -72,6 +87,8 @@ export default function Home() {
   );
 
   const filteredLessons = useMemo(() => {
+    if (selectedCategory === "pdf") return [];
+
     const normalizedQuery = query.trim().toLowerCase();
 
     return visibleLessons.filter((lesson) => {
@@ -86,13 +103,23 @@ export default function Home() {
 
       return subjectMatch && topicMatch && textMatch;
     });
-  }, [query, selectedSubject, selectedTopic, visibleLessons]);
+  }, [query, selectedCategory, selectedSubject, selectedTopic, visibleLessons]);
 
   const selectedLesson = useMemo(() => {
     return visibleLessons.find((lesson) => lesson.id === selectedLessonId) ?? filteredLessons[0] ?? visibleLessons[0];
   }, [filteredLessons, selectedLessonId, visibleLessons]);
 
-  const selectedSubjectData = subjects.find((subject) => subject.id === selectedSubject);
+  const filteredPdfs = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return pdfs;
+
+    return pdfs.filter((pdf) => pdf.title.toLowerCase().includes(normalizedQuery));
+  }, [pdfs, query]);
+
+  const selectedPdf = filteredPdfs.find((pdf) => pdf.id === selectedPdfId);
+
+  const selectedSubjectData =
+    selectedCategory === "subjects" ? subjects.find((subject) => subject.id === selectedSubject) : undefined;
   const topicCount = subjects.reduce((sum, subject) => sum + subject.topics.length, 0);
   const totalHours = Math.round(
     visibleLessons.reduce((sum, lesson) => sum + parseDurationToMinutes(lesson.duration), 0) / 60
@@ -102,6 +129,17 @@ export default function Home() {
     window.localStorage.removeItem("edexcel-auth-role");
     window.localStorage.removeItem("edexcel-auth-email");
     router.push("/");
+  }
+
+  function selectCategory(nextCategory: DashboardCategory) {
+    setSelectedCategory(nextCategory);
+    setSelectedSubject(nextCategory === "subjects" ? subjects[0]?.id ?? "all" : "all");
+    setSelectedTopic("all");
+    setOpenCourseUnit(nextCategory === "subjects" ? "ial-physics-unit-1" : "");
+    setOpenTopicId("");
+    setOpenSubtopicId("");
+    if (nextCategory === "pdf") setSelectedPdfId((current) => current || pdfs[0]?.id || "");
+    setIsCategoryMenuOpen(false);
   }
 
   return (
@@ -127,39 +165,70 @@ export default function Home() {
           <strong>{studentEmail || "Student"}</strong>
         </div>
 
-        <button
-          className={selectedSubject === "all" ? "subject-button active" : "subject-button"}
-          onClick={() => {
-            setSelectedSubject("all");
-            setSelectedTopic("all");
-          }}
-        >
-          <BookOpen size={18} aria-hidden="true" />
-          <span>All Subjects</span>
-          <strong>{visibleLessons.length}</strong>
-        </button>
+        <div className="category-dropdown">
+          <button
+            className="category-trigger"
+            type="button"
+            aria-expanded={isCategoryMenuOpen}
+            aria-controls="dashboardCategoryMenu"
+            onClick={() => setIsCategoryMenuOpen((current) => !current)}
+          >
+            {selectedCategory === "subjects" ? (
+              <BookOpen size={18} aria-hidden="true" />
+            ) : (
+              <FileText size={18} aria-hidden="true" />
+            )}
+            <span>{selectedCategory === "subjects" ? "All Subject" : "PDF"}</span>
+            <ChevronDown size={17} aria-hidden="true" />
+          </button>
 
-        <div className="subject-list">
-          {subjects.map((subject) => {
-            const count = visibleLessons.filter((lesson) => lesson.subjectId === subject.id).length;
-            const isActiveSubject = selectedSubject === subject.id;
-            return (
-              <div className="classroom-group" key={subject.id}>
-                <button
-                  className={isActiveSubject && selectedTopic === "all" ? "subject-button active" : "subject-button"}
-                  onClick={() => {
-                    setSelectedSubject(subject.id);
-                    setSelectedTopic("all");
-                  }}
-                >
-                  <span className="subject-dot" style={{ background: subject.color }} />
-                  <span>{subject.name}</span>
-                  <strong>{count}</strong>
-                </button>
-              </div>
-            );
-          })}
+          {isCategoryMenuOpen && (
+            <div className="category-menu" id="dashboardCategoryMenu" role="menu">
+              <button
+                className={selectedCategory === "subjects" ? "active" : ""}
+                type="button"
+                role="menuitem"
+                onClick={() => selectCategory("subjects")}
+              >
+                <BookOpen size={17} aria-hidden="true" />
+                <span>All Subject</span>
+              </button>
+              <button
+                className={selectedCategory === "pdf" ? "active" : ""}
+                type="button"
+                role="menuitem"
+                onClick={() => selectCategory("pdf")}
+              >
+                <FileText size={17} aria-hidden="true" />
+                <span>PDF</span>
+              </button>
+            </div>
+          )}
         </div>
+
+        {selectedCategory === "subjects" && (
+          <div className="subject-list">
+            {subjects.map((subject) => {
+              const count = visibleLessons.filter((lesson) => lesson.subjectId === subject.id).length;
+              const isActiveSubject = selectedSubject === subject.id;
+              return (
+                <div className="classroom-group" key={subject.id}>
+                  <button
+                    className={isActiveSubject && selectedTopic === "all" ? "subject-button active" : "subject-button"}
+                    onClick={() => {
+                      setSelectedSubject(subject.id);
+                      setSelectedTopic("all");
+                    }}
+                  >
+                    <span className="subject-dot" style={{ background: subject.color }} />
+                    <span>{subject.name}</span>
+                    <strong>{count}</strong>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
       </aside>
 
@@ -181,24 +250,80 @@ export default function Home() {
             <div className="stats">
               <span>
                 <Video size={17} aria-hidden="true" />
-                {visibleLessons.length} lessons
+                {selectedCategory === "pdf" ? `${pdfs.length} PDFs` : `${visibleLessons.length} lessons`}
               </span>
               <span>
                 <Clock3 size={17} aria-hidden="true" />
-                {totalHours}+ hours
+                {selectedCategory === "pdf" ? 0 : totalHours}+ hours
               </span>
               <span>
                 <Layers3 size={17} aria-hidden="true" />
-                {topicCount} topics
+                {selectedCategory === "pdf" ? `${pdfs.length} resources` : `${topicCount} topics`}
               </span>
             </div>
           </div>
         </header>
 
         <div className="classroom-bar">
-          <span>{isLoadingAccess ? "Checking access" : selectedSubjectData?.name ?? "No subject access"}</span>
-          <strong>{selectedTopic === "all" ? "All topics" : selectedTopic}</strong>
+          <span>
+            {isLoadingAccess
+              ? "Checking access"
+              : selectedCategory === "pdf"
+                ? "PDF"
+                : selectedSubjectData?.name ?? "No subject access"}
+          </span>
+          <strong>{selectedCategory === "pdf" ? "All PDFs" : selectedTopic === "all" ? "All topics" : selectedTopic}</strong>
         </div>
+
+        {selectedCategory === "pdf" && pdfs.length > 0 && (
+          <div className="pdf-library">
+            <div className="pdf-list" aria-label="PDF resources">
+              {filteredPdfs.map((pdf, pdfIndex) => {
+                const isPdfOpen = selectedPdf?.id === pdf.id;
+
+                return (
+                  <div className="pdf-item" key={pdf.id}>
+                    <button
+                      className={isPdfOpen ? "pdf-row active" : "pdf-row"}
+                      type="button"
+                      onClick={() => setSelectedPdfId(isPdfOpen ? "" : pdf.id)}
+                    >
+                      <span className="unit-subtopic-number">{pdfIndex + 1}</span>
+                      <span>{pdf.title}</span>
+                      {isPdfOpen ? (
+                        <ChevronUp size={17} aria-hidden="true" />
+                      ) : (
+                        <ChevronDown size={17} aria-hidden="true" />
+                      )}
+                    </button>
+
+                    {isPdfOpen && (
+                      <section className="pdf-viewer" aria-label={`${pdf.title} PDF`}>
+                        <iframe src={buildDriveEmbedUrl(pdf.driveUrl)} title={pdf.title} />
+                      </section>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {!filteredPdfs.length && (
+              <div className="empty-state">
+                <Search size={28} aria-hidden="true" />
+                <strong>No matching PDFs</strong>
+                <span>Try another search term.</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {selectedCategory === "pdf" && !pdfs.length && (
+          <div className="empty-state">
+            <FileText size={28} aria-hidden="true" />
+            <strong>No PDFs yet</strong>
+            <span>PDF resources will appear here.</span>
+          </div>
+        )}
 
         {selectedSubjectData?.units && (
           <div className="course-outline" aria-label={`${selectedSubjectData.name} course outline`}>
@@ -261,7 +386,7 @@ export default function Home() {
 
                             {isExpanded && (
                               <div className="unit-subtopic-list">
-                                {subtopics.map((subtopic) => {
+                                {subtopics.map((subtopic, subtopicIndex) => {
                                   const isSubtopicOpen = openSubtopicId === subtopic.id;
 
                                   return (
@@ -273,7 +398,10 @@ export default function Home() {
                                           if (lesson) setSelectedLessonId(lesson.id);
                                         }}
                                       >
-                                        <span>{subtopic.title}</span>
+                                        <span className="unit-subtopic-label">
+                                          <span className="unit-subtopic-number">{subtopicIndex + 1}</span>
+                                          <span>{subtopic.title}</span>
+                                        </span>
                                         {isSubtopicOpen ? (
                                           <ChevronUp size={17} aria-hidden="true" />
                                         ) : (
@@ -292,12 +420,6 @@ export default function Home() {
                                             allowFullScreen
                                             title={subtopic.title}
                                           />
-                                          <div className="inline-player-actions">
-                                            <a href={subtopic.driveUrl} target="_blank" rel="noreferrer">
-                                              <Link size={16} aria-hidden="true" />
-                                              Open in Google Drive
-                                            </a>
-                                          </div>
                                         </section>
                                       )}
                                     </div>

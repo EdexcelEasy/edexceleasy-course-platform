@@ -156,6 +156,51 @@ export type Database = {
         };
         Relationships: [];
       };
+      admin_pdfs: {
+        Row: {
+          id: string;
+          title: string;
+          drive_url: string;
+          display_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          title: string;
+          drive_url: string;
+          display_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          drive_url?: string;
+          display_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      admin_pdf_access: {
+        Row: {
+          pdf_id: string;
+          email: string;
+          created_at: string;
+        };
+        Insert: {
+          pdf_id: string;
+          email: string;
+          created_at?: string;
+        };
+        Update: {
+          pdf_id?: string;
+          email?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       app_user_roles: {
         Row: {
           email: string;

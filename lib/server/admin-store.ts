@@ -1,4 +1,11 @@
-import { subjectsSeed, type CourseSubtopic, type CourseTopic, type CourseUnit, type Subject } from "@/lib/lessons";
+import {
+  subjectsSeed,
+  type CourseSubtopic,
+  type CourseTopic,
+  type CourseUnit,
+  type PdfResource,
+  type Subject
+} from "@/lib/lessons";
 import type { Database } from "@/lib/supabase/database.types";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -38,6 +45,13 @@ type SubtopicRow = {
   display_order: number;
 };
 
+type PdfResourceRow = {
+  id: string;
+  title: string;
+  drive_url: string;
+  display_order: number;
+};
+
 type AccessRow = {
   email: string;
 };
@@ -64,6 +78,68 @@ export async function getAdminSubjects() {
   const snapshot = await readStore();
 
   return buildSubjects(snapshot);
+}
+
+export async function getPdfResources() {
+  const pdfs = await runQuery(getSupabase().from("admin_pdfs").select("*").order("display_order", { ascending: true }));
+  const pdfAccess = await runOptionalQuery(
+    getSupabase().from("admin_pdf_access").select("pdf_id,email").order("email", { ascending: true })
+  );
+  const accessByPdf = groupAccessByOwner(pdfAccess.data ?? [], "pdf_id");
+
+  return ((pdfs.data ?? []) as PdfResourceRow[]).map((row) => buildPdfResource(row, accessByPdf[row.id] ?? []));
+}
+
+export async function addPdfResource(title: string, driveUrl: string) {
+  const trimmedTitle = title.trim();
+  const trimmedDriveUrl = driveUrl.trim();
+
+  if (!trimmedTitle || !trimmedDriveUrl) return getPdfResources();
+
+  const pdfCount = await countRows("admin_pdfs");
+
+  await runQuery(
+    getSupabase().from("admin_pdfs").insert({
+      id: `${slugify(trimmedTitle)}-${Date.now()}`,
+      title: trimmedTitle,
+      drive_url: trimmedDriveUrl,
+      display_order: pdfCount
+    })
+  );
+
+  return getPdfResources();
+}
+
+export async function removePdfResource(pdfId: string) {
+  await runQuery(getSupabase().from("admin_pdfs").delete().eq("id", pdfId));
+
+  return getPdfResources();
+}
+
+export async function addPdfAccess(pdfId: string, email: string) {
+  const normalizedEmail = normalizeEmail(email);
+
+  if (!normalizedEmail) return getPdfResources();
+
+  await runQuery(
+    getSupabase().from("admin_pdf_access").upsert(
+      {
+        pdf_id: pdfId,
+        email: normalizedEmail
+      },
+      { onConflict: "pdf_id,email" }
+    )
+  );
+
+  return getPdfResources();
+}
+
+export async function removePdfAccess(pdfId: string, email: string) {
+  const normalizedEmail = normalizeEmail(email);
+
+  await runQuery(getSupabase().from("admin_pdf_access").delete().eq("pdf_id", pdfId).eq("email", normalizedEmail));
+
+  return getPdfResources();
 }
 
 export async function addSubject(name: string) {
@@ -447,6 +523,15 @@ function buildTopic(topic: TopicRow, snapshot: StoreSnapshot): CourseTopic {
   };
 }
 
+function buildPdfResource(row: PdfResourceRow, allowedEmails: string[]): PdfResource {
+  return {
+    id: row.id,
+    title: row.title,
+    driveUrl: row.drive_url,
+    allowedEmails
+  };
+}
+
 function getUnitTopicItems(unit: CourseUnit): CourseTopic[] {
   if (unit.topicItems?.length) return unit.topicItems;
 
@@ -457,7 +542,7 @@ function getUnitTopicItems(unit: CourseUnit): CourseTopic[] {
   }));
 }
 
-function groupAccessByOwner(rows: unknown[], ownerKey: "unit_id") {
+function groupAccessByOwner(rows: unknown[], ownerKey: "unit_id" | "pdf_id") {
   return rows.reduce<Record<string, string[]>>((grouped, row) => {
     const accessRow = row as AccessRow & Record<typeof ownerKey, string>;
     grouped[accessRow[ownerKey]] = [...(grouped[accessRow[ownerKey]] ?? []), accessRow.email];
@@ -484,4 +569,18 @@ async function runQuery<T>(query: PromiseLike<{ data: T; error: { message: strin
   }
 
   return result;
+}
+
+async function runOptionalQuery<T>(query: PromiseLike<{ data: T; error: { message: string } | null }>) {
+  const result = await query;
+
+  if (result.error && !isMissingSchemaCacheTableError(result.error.message)) {
+    throw new Error(result.error.message);
+  }
+
+  return result.error ? { data: null } : result;
+}
+
+function isMissingSchemaCacheTableError(message: string) {
+  return message.includes("schema cache") && message.includes("Could not find the table");
 }

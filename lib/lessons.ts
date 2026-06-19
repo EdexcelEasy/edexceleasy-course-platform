@@ -29,6 +29,13 @@ export type CourseSubtopic = {
   driveUrl: string;
 };
 
+export type PdfResource = {
+  id: string;
+  title: string;
+  driveUrl: string;
+  allowedEmails?: string[];
+};
+
 export type Lesson = {
   id: string;
   title: string;

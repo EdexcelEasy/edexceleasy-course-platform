@@ -254,6 +254,66 @@ button {
   gap: 7px;
 }
 
+.category-dropdown {
+  position: relative;
+}
+
+.category-trigger {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #e5e7eb;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 18px 1fr 18px;
+  min-height: 46px;
+  padding: 0 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.category-trigger span,
+.category-menu span {
+  font-weight: 800;
+}
+
+.category-menu {
+  background: #182132;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  box-shadow: 0 18px 35px rgba(0, 0, 0, 0.3);
+  display: grid;
+  gap: 4px;
+  left: 0;
+  padding: 6px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+}
+
+.category-menu button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: #e5e7eb;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 17px 1fr;
+  justify-content: start;
+  min-height: 38px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.category-trigger:hover,
+.category-menu button:hover,
+.category-menu button.active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .subject-button {
   align-items: center;
   background: transparent;
@@ -614,11 +674,33 @@ h2 {
   border-bottom: 1px solid var(--line);
   color: #374151;
   display: flex;
+  gap: 12px;
   font-weight: 800;
   justify-content: space-between;
   min-height: 52px;
   padding: 0 18px 0 58px;
   text-align: left;
+}
+
+.unit-subtopic-label {
+  align-items: center;
+  display: inline-flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.unit-subtopic-number {
+  align-items: center;
+  background: #eef2ff;
+  border: 1px solid #dbe4ff;
+  border-radius: 999px;
+  color: var(--brand-dark);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 12px;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
 }
 
 .unit-subtopic-row.active,
@@ -631,6 +713,66 @@ h2 {
   color: var(--muted);
   font-size: 13px;
   padding: 16px 18px 16px 58px;
+}
+
+.pdf-library {
+  display: grid;
+  gap: 16px;
+}
+
+.pdf-list {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: grid;
+  overflow: hidden;
+}
+
+.pdf-item {
+  border-bottom: 1px solid var(--line);
+  display: grid;
+}
+
+.pdf-item:last-child {
+  border-bottom: 0;
+}
+
+.pdf-row {
+  align-items: center;
+  background: #ffffff;
+  border: 0;
+  color: #374151;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 24px 1fr 24px;
+  min-height: 54px;
+  padding: 0 16px;
+  text-align: left;
+}
+
+.pdf-row span:nth-child(2) {
+  font-weight: 900;
+}
+
+.pdf-row.active,
+.pdf-row:hover {
+  background: #f5f7fb;
+  color: var(--brand-dark);
+}
+
+.pdf-viewer {
+  background: #ffffff;
+  border-top: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.pdf-viewer iframe {
+  border: 0;
+  display: block;
+  height: min(78vh, 820px);
+  min-height: 560px;
+  width: 100%;
 }
 
 .classroom-bar {
@@ -678,20 +820,6 @@ h2 {
   display: block;
   min-height: 360px;
   width: 100%;
-}
-
-.inline-player-actions {
-  border-top: 1px solid var(--line);
-  padding: 12px 16px;
-}
-
-.inline-player-actions a {
-  align-items: center;
-  color: var(--brand-dark);
-  display: inline-flex;
-  font-weight: 800;
-  gap: 8px;
-  text-decoration: none;
 }
 
 .search-row svg {
@@ -859,6 +987,31 @@ h2 {
   flex-direction: column;
   gap: 18px;
   padding: 24px 18px;
+}
+
+.admin-section-switch {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.admin-section-switch button {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #e5e7eb;
+  display: inline-flex;
+  font-weight: 800;
+  gap: 8px;
+  justify-content: center;
+  min-height: 42px;
+  padding: 8px;
+}
+
+.admin-section-switch button.active,
+.admin-section-switch button:hover {
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .admin-subject-list {
@@ -1077,6 +1230,130 @@ h2 {
 .admin-email-list {
   display: grid;
   gap: 10px;
+}
+
+.admin-pdf-form {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(160px, 0.8fr) minmax(220px, 1.2fr) 132px;
+}
+
+.admin-pdf-form input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 44px;
+  min-width: 0;
+  padding: 0 12px;
+}
+
+.admin-pdf-form button {
+  align-items: center;
+  background: var(--brand);
+  border: 0;
+  border-radius: 8px;
+  color: #ffffff;
+  display: inline-flex;
+  font-weight: 900;
+  gap: 8px;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+
+.admin-pdf-form button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.admin-pdf-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-pdf-row {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 40px;
+  padding: 12px;
+}
+
+.admin-pdf-main {
+  display: grid;
+  gap: 3px;
+}
+
+.admin-pdf-main span {
+  align-items: center;
+  display: inline-flex;
+  font-weight: 900;
+  gap: 9px;
+}
+
+.admin-pdf-main small {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.admin-pdf-row > button {
+  background: #fee2e2;
+  color: var(--danger);
+  min-width: 40px;
+  padding: 0;
+}
+
+.admin-pdf-access-form {
+  display: grid;
+  gap: 8px;
+  grid-column: 1 / -1;
+  grid-template-columns: 1fr 40px;
+}
+
+.admin-pdf-access-form input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 40px;
+  min-width: 0;
+  padding: 0 10px;
+}
+
+.admin-pdf-access-form button {
+  background: var(--brand);
+  color: #ffffff;
+  min-width: 40px;
+  padding: 0;
+}
+
+.admin-pdf-access-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
+.admin-pdf-access-list span {
+  align-items: center;
+  background: #eef2ff;
+  border: 1px solid #dbe4ff;
+  border-radius: 999px;
+  color: var(--brand-dark);
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 900;
+  gap: 7px;
+  min-height: 32px;
+  padding: 4px 4px 4px 10px;
+}
+
+.admin-pdf-access-list button {
+  background: #ffffff;
+  color: var(--danger);
+  min-height: 24px;
+  min-width: 24px;
+  padding: 0;
 }
 
 .admin-unit-list {
@@ -1430,6 +1707,7 @@ h2 {
 
   .admin-header,
   .admin-email-form > div,
+  .admin-pdf-form,
   .admin-subtopic-form {
     display: grid;
   }

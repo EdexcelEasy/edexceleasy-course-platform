@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   BookOpen,
   Check,
+  FileText,
   Layers3,
   Loader2,
   LogOut,
@@ -13,13 +14,19 @@ import {
   Trash2,
   X
 } from "lucide-react";
-import type { CourseTopic, CourseUnit, Subject } from "@/lib/lessons";
+import type { CourseTopic, CourseUnit, PdfResource, Subject } from "@/lib/lessons";
+
+type AdminSection = "subjects" | "pdf";
 
 export default function AdminPage() {
   const router = useRouter();
+  const [activeSection, setActiveSection] = useState<AdminSection>("subjects");
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [pdfs, setPdfs] = useState<PdfResource[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [subjectName, setSubjectName] = useState("");
+  const [pdfDraft, setPdfDraft] = useState({ title: "", driveUrl: "" });
+  const [pdfEmailDrafts, setPdfEmailDrafts] = useState<Record<string, string>>({});
   const [unitTitle, setUnitTitle] = useState("");
   const [topicDrafts, setTopicDrafts] = useState<Record<string, string>>({});
   const [editingTopicId, setEditingTopicId] = useState("");
@@ -41,6 +48,7 @@ export default function AdminPage() {
     }
 
     void loadSubjects();
+    void loadPdfs();
   }, [router]);
 
   const selectedSubject = useMemo(
@@ -74,6 +82,15 @@ export default function AdminPage() {
     });
   }
 
+  async function loadPdfs() {
+    try {
+      const data = await readPdfsResponse(await fetch("/api/admin/pdfs", { cache: "no-store" }));
+      setPdfs(data.pdfs);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Unable to load PDFs.");
+    }
+  }
+
   async function handleAddSubject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!subjectName.trim()) return;
@@ -88,6 +105,62 @@ export default function AdminPage() {
     const newSubjectId = slugify(subjectName);
     applySubjects(data, data.subjects.some((subject) => subject.id === newSubjectId) ? newSubjectId : selectedSubjectId);
     setSubjectName("");
+    setIsSaving(false);
+  }
+
+  async function handleAddPdf(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!pdfDraft.title.trim() || !pdfDraft.driveUrl.trim()) return;
+
+    setIsSaving(true);
+    const response = await fetch("/api/admin/pdfs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(pdfDraft)
+    });
+    const data = await readPdfsResponse(response);
+    setPdfs(data.pdfs);
+    setPdfDraft({ title: "", driveUrl: "" });
+    setIsSaving(false);
+  }
+
+  async function handleDeletePdf(pdfId: string, pdfTitle: string) {
+    if (!window.confirm(`Delete ${pdfTitle}?`)) return;
+
+    setIsSaving(true);
+    const response = await fetch(`/api/admin/pdfs/${pdfId}`, {
+      method: "DELETE"
+    });
+    const data = await readPdfsResponse(response);
+    setPdfs(data.pdfs);
+    setIsSaving(false);
+  }
+
+  async function handleAddPdfEmail(event: FormEvent<HTMLFormElement>, pdfId: string) {
+    event.preventDefault();
+    if (!pdfEmailDrafts[pdfId]?.trim()) return;
+
+    setIsSaving(true);
+    const response = await fetch(`/api/admin/pdfs/${pdfId}/access`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: pdfEmailDrafts[pdfId] })
+    });
+    const data = await readPdfsResponse(response);
+    setPdfs(data.pdfs);
+    setPdfEmailDrafts((current) => ({ ...current, [pdfId]: "" }));
+    setIsSaving(false);
+  }
+
+  async function handleRemovePdfEmail(pdfId: string, email: string) {
+    setIsSaving(true);
+    const response = await fetch(`/api/admin/pdfs/${pdfId}/access`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email })
+    });
+    const data = await readPdfsResponse(response);
+    setPdfs(data.pdfs);
     setIsSaving(false);
   }
 
@@ -263,55 +336,163 @@ export default function AdminPage() {
           Logout
         </button>
 
-        <form className="admin-sidebar-form" onSubmit={handleAddSubject}>
-          <label htmlFor="subjectName">New subject</label>
-          <div>
-            <input
-              id="subjectName"
-              value={subjectName}
-              onChange={(event) => setSubjectName(event.target.value)}
-              placeholder="e.g. Chemistry"
-            />
-            <button type="submit" disabled={isSaving} title="Create subject">
-              <Plus size={17} aria-hidden="true" />
-            </button>
-          </div>
-        </form>
-
-        <div className="admin-subject-list">
-          {subjects.map((subject) => (
-            <div className="admin-subject-row" key={subject.id}>
-              <button
-                className={selectedSubject?.id === subject.id ? "admin-subject-button active" : "admin-subject-button"}
-                onClick={() => setSelectedSubjectId(subject.id)}
-                type="button"
-              >
-                <span className="subject-dot" style={{ background: subject.color }} />
-                <span>{subject.name}</span>
-              </button>
-              <button
-                className="admin-subject-delete"
-                disabled={isSaving}
-                onClick={() => void handleDeleteSubject(subject.id, subject.name)}
-                title={`Delete ${subject.name}`}
-                type="button"
-              >
-                <Trash2 size={15} aria-hidden="true" />
-              </button>
-            </div>
-          ))}
+        <div className="admin-section-switch">
+          <button
+            className={activeSection === "subjects" ? "active" : ""}
+            type="button"
+            onClick={() => setActiveSection("subjects")}
+          >
+            <BookOpen size={17} aria-hidden="true" />
+            Subjects
+          </button>
+          <button
+            className={activeSection === "pdf" ? "active" : ""}
+            type="button"
+            onClick={() => setActiveSection("pdf")}
+          >
+            <FileText size={17} aria-hidden="true" />
+            PDF
+          </button>
         </div>
+
+        {activeSection === "subjects" && (
+          <>
+            <form className="admin-sidebar-form" onSubmit={handleAddSubject}>
+              <label htmlFor="subjectName">New subject</label>
+              <div>
+                <input
+                  id="subjectName"
+                  value={subjectName}
+                  onChange={(event) => setSubjectName(event.target.value)}
+                  placeholder="e.g. Chemistry"
+                />
+                <button type="submit" disabled={isSaving} title="Create subject">
+                  <Plus size={17} aria-hidden="true" />
+                </button>
+              </div>
+            </form>
+
+            <div className="admin-subject-list">
+              {subjects.map((subject) => (
+                <div className="admin-subject-row" key={subject.id}>
+                  <button
+                    className={selectedSubject?.id === subject.id ? "admin-subject-button active" : "admin-subject-button"}
+                    onClick={() => setSelectedSubjectId(subject.id)}
+                    type="button"
+                  >
+                    <span className="subject-dot" style={{ background: subject.color }} />
+                    <span>{subject.name}</span>
+                  </button>
+                  <button
+                    className="admin-subject-delete"
+                    disabled={isSaving}
+                    onClick={() => void handleDeleteSubject(subject.id, subject.name)}
+                    title={`Delete ${subject.name}`}
+                    type="button"
+                  >
+                    <Trash2 size={15} aria-hidden="true" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </aside>
 
       <section className="admin-content">
         <header className="admin-header">
           <div>
-            <p className="eyebrow">Permissions</p>
-            <h1>Welcome admin</h1>
+            <p className="eyebrow">{activeSection === "pdf" ? "Resources" : "Permissions"}</p>
+            <h1>{activeSection === "pdf" ? "PDF library" : "Welcome admin"}</h1>
           </div>
         </header>
 
-        {isLoading ? (
+        {activeSection === "pdf" ? (
+          <div className="admin-panel">
+            <div className="admin-panel-heading">
+              <div>
+                <p className="eyebrow">PDF</p>
+                <h2>Google Drive PDF resources</h2>
+              </div>
+              <strong>{pdfs.length}</strong>
+            </div>
+
+            <form className="admin-pdf-form" onSubmit={handleAddPdf}>
+              <input
+                value={pdfDraft.title}
+                onChange={(event) => setPdfDraft((current) => ({ ...current, title: event.target.value }))}
+                placeholder="PDF title"
+              />
+              <input
+                value={pdfDraft.driveUrl}
+                onChange={(event) => setPdfDraft((current) => ({ ...current, driveUrl: event.target.value }))}
+                placeholder="Google Drive PDF link"
+              />
+              <button type="submit" disabled={isSaving}>
+                <Plus size={17} aria-hidden="true" />
+                Add PDF
+              </button>
+            </form>
+
+            <div className="admin-pdf-list">
+              {pdfs.map((pdf) => (
+                <div className="admin-pdf-row" key={pdf.id}>
+                  <div className="admin-pdf-main">
+                    <span>
+                      <FileText size={17} aria-hidden="true" />
+                      {pdf.title}
+                    </span>
+                    <small>{(pdf.allowedEmails ?? []).length} allowed students</small>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={() => void handleDeletePdf(pdf.id, pdf.title)}
+                    title={`Delete ${pdf.title}`}
+                  >
+                    <Trash2 size={15} aria-hidden="true" />
+                  </button>
+                  <form className="admin-pdf-access-form" onSubmit={(event) => void handleAddPdfEmail(event, pdf.id)}>
+                    <input
+                      value={pdfEmailDrafts[pdf.id] ?? ""}
+                      onChange={(event) =>
+                        setPdfEmailDrafts((current) => ({ ...current, [pdf.id]: event.target.value }))
+                      }
+                      placeholder="Allow Gmail for this PDF"
+                      type="email"
+                    />
+                    <button type="submit" disabled={isSaving}>
+                      <Plus size={15} aria-hidden="true" />
+                    </button>
+                  </form>
+                  {(pdf.allowedEmails ?? []).length > 0 && (
+                    <div className="admin-pdf-access-list">
+                      {(pdf.allowedEmails ?? []).map((allowedEmail) => (
+                        <span key={allowedEmail}>
+                          {allowedEmail}
+                          <button
+                            type="button"
+                            disabled={isSaving}
+                            onClick={() => void handleRemovePdfEmail(pdf.id, allowedEmail)}
+                          >
+                            <Trash2 size={13} aria-hidden="true" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {!pdfs.length && (
+                <div className="admin-empty">
+                  <FileText size={24} aria-hidden="true" />
+                  <strong>No PDFs yet</strong>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : isLoading ? (
           <div className="admin-empty">
             <Loader2 size={28} aria-hidden="true" />
             <strong>Loading subjects</strong>
@@ -631,4 +812,15 @@ async function readSubjectsResponse(response: Response) {
   }
 
   return { subjects: data.subjects ?? [] };
+}
+
+async function readPdfsResponse(response: Response) {
+  const text = await response.text();
+  const data = text ? (JSON.parse(text) as { pdfs?: PdfResource[]; error?: string }) : {};
+
+  if (!response.ok) {
+    throw new Error(data.error ?? `Request failed with status ${response.status}.`);
+  }
+
+  return { pdfs: data.pdfs ?? [] };
 }
