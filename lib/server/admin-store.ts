@@ -45,7 +45,6 @@ type AccessRow = {
 type StoreSnapshot = {
   subjects: SubjectRow[];
   subjectTopics: SubjectTopicRow[];
-  subjectAccess: Record<string, string[]>;
   units: UnitRow[];
   unitAccess: Record<string, string[]>;
   topics: TopicRow[];
@@ -90,35 +89,6 @@ export async function addSubject(name: string) {
 
 export async function removeSubject(subjectId: string) {
   await runQuery(getSupabase().from("admin_subjects").delete().eq("id", subjectId));
-
-  return getAdminSubjects();
-}
-
-export async function addSubjectAccess(subjectId: string, email: string) {
-  const normalizedEmail = normalizeEmail(email);
-
-  if (!normalizedEmail) return getAdminSubjects();
-
-  await ensureSubject(subjectId);
-  await runQuery(
-    getSupabase().from("admin_subject_access").upsert(
-      {
-        subject_id: subjectId,
-        email: normalizedEmail
-      },
-      { onConflict: "subject_id,email" }
-    )
-  );
-
-  return getAdminSubjects();
-}
-
-export async function removeSubjectAccess(subjectId: string, email: string) {
-  const normalizedEmail = normalizeEmail(email);
-
-  await runQuery(
-    getSupabase().from("admin_subject_access").delete().eq("subject_id", subjectId).eq("email", normalizedEmail)
-  );
 
   return getAdminSubjects();
 }
@@ -407,10 +377,9 @@ async function upsertSubjectTopic(subjectId: string, title: string) {
 }
 
 async function readStore(): Promise<StoreSnapshot> {
-  const [subjects, subjectTopics, subjectAccess, units, unitAccess, topics, subtopics] = await Promise.all([
+  const [subjects, subjectTopics, units, unitAccess, topics, subtopics] = await Promise.all([
     runQuery(getSupabase().from("admin_subjects").select("*").order("display_order", { ascending: true })),
     runQuery(getSupabase().from("admin_subject_topics").select("*").order("display_order", { ascending: true })),
-    runQuery(getSupabase().from("admin_subject_access").select("subject_id,email").order("email", { ascending: true })),
     runQuery(getSupabase().from("admin_units").select("*").order("display_order", { ascending: true })),
     runQuery(getSupabase().from("admin_unit_access").select("unit_id,email").order("email", { ascending: true })),
     runQuery(getSupabase().from("admin_topics").select("*").order("display_order", { ascending: true })),
@@ -420,7 +389,6 @@ async function readStore(): Promise<StoreSnapshot> {
   return {
     subjects: (subjects.data ?? []) as SubjectRow[],
     subjectTopics: (subjectTopics.data ?? []) as SubjectTopicRow[],
-    subjectAccess: groupAccessByOwner(subjectAccess.data ?? [], "subject_id"),
     units: (units.data ?? []) as UnitRow[],
     unitAccess: groupAccessByOwner(unitAccess.data ?? [], "unit_id"),
     topics: (topics.data ?? []) as TopicRow[],
@@ -443,7 +411,7 @@ function buildSubjects(snapshot: StoreSnapshot): Subject[] {
       name: subject.name,
       color: subject.color,
       topics: subjectTopics.length ? subjectTopics : units.flatMap((unit) => unit.topics),
-      allowedEmails: snapshot.subjectAccess[subject.id] ?? [],
+      allowedEmails: [],
       units
     };
   });
@@ -489,7 +457,7 @@ function getUnitTopicItems(unit: CourseUnit): CourseTopic[] {
   }));
 }
 
-function groupAccessByOwner(rows: unknown[], ownerKey: "subject_id" | "unit_id") {
+function groupAccessByOwner(rows: unknown[], ownerKey: "unit_id") {
   return rows.reduce<Record<string, string[]>>((grouped, row) => {
     const accessRow = row as AccessRow & Record<typeof ownerKey, string>;
     grouped[accessRow[ownerKey]] = [...(grouped[accessRow[ownerKey]] ?? []), accessRow.email];

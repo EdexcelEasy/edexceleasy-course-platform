@@ -51,24 +51,6 @@ export type Database = {
         };
         Relationships: [];
       };
-      admin_subject_access: {
-        Row: {
-          subject_id: string;
-          email: string;
-          created_at: string;
-        };
-        Insert: {
-          subject_id: string;
-          email: string;
-          created_at?: string;
-        };
-        Update: {
-          subject_id?: string;
-          email?: string;
-          created_at?: string;
-        };
-        Relationships: [];
-      };
       admin_units: {
         Row: {
           id: string;

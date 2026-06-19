@@ -217,9 +217,18 @@ button {
   border-radius: 8px;
   color: var(--brand);
   display: inline-flex;
-  height: 44px;
+  flex: 0 0 auto;
+  height: 52px;
   justify-content: center;
-  width: 44px;
+  overflow: hidden;
+  width: 52px;
+}
+
+.brand-logo {
+  display: block;
+  height: 48px;
+  object-fit: contain;
+  width: 48px;
 }
 
 .brand p {

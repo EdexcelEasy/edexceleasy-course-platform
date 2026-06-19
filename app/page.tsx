@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { GraduationCap, LogIn, ShieldCheck, UserRound } from "lucide-react";
+import { LogIn, ShieldCheck, UserRound } from "lucide-react";
 
 const ADMIN_EMAIL = "admin@edexceleasy.com";
 const ADMIN_PASSWORD = "admin123";
@@ -51,7 +51,7 @@ export default function LoginPage() {
       <section className="login-panel">
         <div className="login-brand">
           <span className="brand-mark">
-            <GraduationCap size={25} aria-hidden="true" />
+            <img className="brand-logo" src="/logo.png" alt="" />
           </span>
           <div>
             <p>EdexcelEasy</p>

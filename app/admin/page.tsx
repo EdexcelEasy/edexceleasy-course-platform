@@ -5,11 +5,9 @@ import { useRouter } from "next/navigation";
 import {
   BookOpen,
   Check,
-  GraduationCap,
   Layers3,
   Loader2,
   LogOut,
-  Mail,
   Pencil,
   Plus,
   Trash2,
@@ -21,7 +19,6 @@ export default function AdminPage() {
   const router = useRouter();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
-  const [email, setEmail] = useState("");
   const [subjectName, setSubjectName] = useState("");
   const [unitTitle, setUnitTitle] = useState("");
   const [topicDrafts, setTopicDrafts] = useState<Record<string, string>>({});
@@ -75,21 +72,6 @@ export default function AdminPage() {
 
       return data.subjects[0]?.id ?? "";
     });
-  }
-
-  async function handleAddEmail(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selectedSubject || !email.trim()) return;
-
-    setIsSaving(true);
-    const response = await fetch(`/api/admin/subjects/${selectedSubject.id}/access`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email })
-    });
-    applySubjects(await readSubjectsResponse(response), selectedSubject.id);
-    setEmail("");
-    setIsSaving(false);
   }
 
   async function handleAddSubject(event: FormEvent<HTMLFormElement>) {
@@ -242,19 +224,8 @@ export default function AdminPage() {
     setIsSaving(false);
   }
 
-  async function handleRemoveEmail(subjectId: string, emailToRemove: string) {
-    setIsSaving(true);
-    const response = await fetch(`/api/admin/subjects/${subjectId}/access`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: emailToRemove })
-    });
-    applySubjects(await readSubjectsResponse(response), subjectId);
-    setIsSaving(false);
-  }
-
   async function handleDeleteSubject(subjectId: string, subjectName: string) {
-    if (!window.confirm(`Delete ${subjectName}? This will also remove its units, topics, and access list.`)) return;
+    if (!window.confirm(`Delete ${subjectName}? This will also remove its units, topics, and unit access list.`)) return;
 
     setIsSaving(true);
     const response = await fetch(`/api/admin/subjects/${subjectId}`, {
@@ -279,7 +250,7 @@ export default function AdminPage() {
       <aside className="admin-sidebar">
         <div className="brand">
           <span className="brand-mark">
-            <GraduationCap size={24} aria-hidden="true" />
+            <img className="brand-logo" src="/logo.png" alt="" />
           </span>
           <div>
             <p>EdexcelEasy</p>
@@ -317,7 +288,6 @@ export default function AdminPage() {
               >
                 <span className="subject-dot" style={{ background: subject.color }} />
                 <span>{subject.name}</span>
-                <strong>{subject.allowedEmails.length}</strong>
               </button>
               <button
                 className="admin-subject-delete"
@@ -337,7 +307,7 @@ export default function AdminPage() {
         <header className="admin-header">
           <div>
             <p className="eyebrow">Permissions</p>
-            <h1>Email name</h1>
+            <h1>Welcome admin</h1>
           </div>
         </header>
 
@@ -357,9 +327,8 @@ export default function AdminPage() {
             <div className="admin-panel-heading">
               <div>
                 <p className="eyebrow">{selectedSubject.name}</p>
-                <h2>Allowed student Gmail accounts</h2>
+                <h2>Units and lesson access</h2>
               </div>
-              <strong>{selectedSubject.allowedEmails.length}</strong>
             </div>
 
             <form className="admin-email-form" onSubmit={handleAddUnit}>
@@ -625,49 +594,6 @@ export default function AdminPage() {
                 <div className="admin-empty">
                   <BookOpen size={24} aria-hidden="true" />
                   <strong>No units yet</strong>
-                </div>
-              )}
-            </div>
-
-            <form className="admin-email-form" onSubmit={handleAddEmail}>
-              <label htmlFor="adminEmail">
-                <Mail size={17} aria-hidden="true" />
-                Gmail address
-              </label>
-              <div>
-                <input
-                  id="adminEmail"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="student@gmail.com"
-                  type="email"
-                />
-                <button type="submit" disabled={isSaving}>
-                  <Plus size={18} aria-hidden="true" />
-                  Add access
-                </button>
-              </div>
-            </form>
-
-            <div className="admin-email-list">
-              {selectedSubject.allowedEmails.map((allowedEmail) => (
-                <div className="admin-email-row" key={allowedEmail}>
-                  <span>{allowedEmail}</span>
-                  <button
-                    type="button"
-                    disabled={isSaving}
-                    onClick={() => void handleRemoveEmail(selectedSubject.id, allowedEmail)}
-                    title="Remove Gmail access"
-                  >
-                    <Trash2 size={17} aria-hidden="true" />
-                  </button>
-                </div>
-              ))}
-
-              {!selectedSubject.allowedEmails.length && (
-                <div className="admin-empty">
-                  <Mail size={24} aria-hidden="true" />
-                  <strong>No Gmail access yet</strong>
                 </div>
               )}
             </div>

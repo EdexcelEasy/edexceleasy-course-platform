@@ -5,7 +5,6 @@ import {
   ChevronDown,
   ChevronUp,
   Clock3,
-  GraduationCap,
   Layers3,
   Link,
   LogOut,
@@ -110,7 +109,7 @@ export default function Home() {
       <aside className="sidebar" aria-label="Subject navigation">
         <div className="brand">
           <span className="brand-mark">
-            <GraduationCap size={24} aria-hidden="true" />
+            <img className="brand-logo" src="/logo.png" alt="" />
           </span>
           <div>
             <p>EdexcelEasy</p>
@@ -341,11 +340,10 @@ export default function Home() {
 }
 
 function getPermittedSubject(subject: Subject, email: string): Subject | null {
-  const hasSubjectAccess = subject.allowedEmails.includes(email);
   const permittedUnits = (subject.units ?? []).filter((unit) => (unit.allowedEmails ?? []).includes(email));
 
   if (subject.units?.length) {
-    if (!hasSubjectAccess && !permittedUnits.length) return null;
+    if (!permittedUnits.length) return null;
 
     const permittedTopics = permittedUnits.flatMap((unit) => unit.topics);
 
@@ -356,11 +354,7 @@ function getPermittedSubject(subject: Subject, email: string): Subject | null {
     };
   }
 
-  if (!hasSubjectAccess) return null;
-
-  return {
-    ...subject
-  };
+  return null;
 }
 
 function slugify(value: string) {
@@ -381,8 +375,6 @@ function hydrateSubjectTopics(subjects: Subject[], lessons: Lesson[]) {
     const seedSubject = subjectsSeed.find((item) => item.id === subject.id);
     const savedTopics = subject.topics ?? [];
     const seedTopics = seedSubject?.topics ?? [];
-    const savedEmails = subject.allowedEmails ?? [];
-    const seedEmails = seedSubject?.allowedEmails ?? [];
     const lessonTopics = lessons
       .filter((lesson) => lesson.subjectId === subject.id)
       .map((lesson) => lesson.topic)
@@ -391,7 +383,7 @@ function hydrateSubjectTopics(subjects: Subject[], lessons: Lesson[]) {
     return {
       ...subject,
       name: seedSubject?.name ?? subject.name,
-      allowedEmails: Array.from(new Set([...seedEmails, ...savedEmails].map(normalizeEmail).filter(Boolean))),
+      allowedEmails: [],
       units: seedSubject?.units ?? subject.units,
       topics: Array.from(new Set([...seedTopics, ...savedTopics, ...lessonTopics]))
     };
