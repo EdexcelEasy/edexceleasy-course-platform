@@ -247,6 +247,7 @@ export type Database = {
         Row: {
           email: string;
           role: "admin" | "student";
+          password_hash: string;
           full_name: string | null;
           created_at: string;
           updated_at: string;
@@ -254,6 +255,7 @@ export type Database = {
         Insert: {
           email: string;
           role: "admin" | "student";
+          password_hash: string;
           full_name?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -261,6 +263,7 @@ export type Database = {
         Update: {
           email?: string;
           role?: "admin" | "student";
+          password_hash?: string;
           full_name?: string | null;
           created_at?: string;
           updated_at?: string;

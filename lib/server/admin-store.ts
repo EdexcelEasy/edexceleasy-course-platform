@@ -1,3 +1,4 @@
+import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import {
   subjectsSeed,
   type CourseSubtopic,
@@ -68,6 +69,22 @@ type AccessRow = {
   email: string;
 };
 
+type AppUserRoleRow = {
+  email: string;
+  role: "admin" | "student";
+  password_hash: string | null;
+  full_name?: string | null;
+  created_at?: string;
+};
+
+export type RegisteredStudent = {
+  email: string;
+  fullName: string | null;
+  createdAt: string;
+};
+
+export type RegisteredAdmin = RegisteredStudent;
+
 type StoreSnapshot = {
   subjects: SubjectRow[];
   subjectTopics: SubjectTopicRow[];
@@ -90,6 +107,195 @@ export async function getAdminSubjects() {
   const snapshot = await readStore();
 
   return buildSubjects(snapshot);
+}
+
+export async function resolveUserRole(email: string, password: string) {
+  const normalizedEmail = normalizeEmail(email);
+  const enteredPassword = password.trim();
+
+  if (!normalizedEmail || !enteredPassword) {
+    throw new Error("Enter your email and password.");
+  }
+
+  const result = await runQuery(
+    getSupabase().from("app_user_roles").select("email,role,password_hash,full_name").eq("email", normalizedEmail).maybeSingle()
+  );
+  const userRole = result.data as AppUserRoleRow | null;
+
+  if (!userRole?.password_hash || !verifyPassword(enteredPassword, userRole.password_hash)) {
+    throw new Error("Email or password is incorrect.");
+  }
+
+  return {
+    email: normalizedEmail,
+    fullName: userRole.full_name ?? null,
+    role: userRole.role
+  };
+}
+
+export async function getRegisteredStudents() {
+  return getRegisteredUsersByRole("student");
+}
+
+export async function getRegisteredAdmins() {
+  return getRegisteredUsersByRole("admin");
+}
+
+async function getRegisteredUsersByRole(role: "admin" | "student") {
+  const result = await runQuery(
+    getSupabase()
+      .from("app_user_roles")
+      .select("email,full_name,created_at")
+      .eq("role", role)
+      .order("created_at", { ascending: false })
+  );
+
+  return ((result.data ?? []) as AppUserRoleRow[]).map(buildRegisteredStudent);
+}
+
+export async function addRegisteredStudent(email: string, password: string, fullName = "") {
+  return addRegisteredUser("student", email, password, fullName);
+}
+
+export async function addRegisteredAdmin(email: string, password: string, fullName = "") {
+  return addRegisteredUser("admin", email, password, fullName);
+}
+
+async function addRegisteredUser(role: "admin" | "student", email: string, password: string, fullName = "") {
+  const normalizedEmail = normalizeEmail(email);
+  const enteredPassword = password.trim();
+  const trimmedName = fullName.trim();
+
+  if (!normalizedEmail || !enteredPassword) {
+    throw new Error(`Enter ${role} email and password.`);
+  }
+
+  const existing = await runQuery(
+    getSupabase().from("app_user_roles").select("email,role").eq("email", normalizedEmail).maybeSingle()
+  );
+  const existingUser = existing.data as AppUserRoleRow | null;
+
+  if (existingUser && existingUser.role !== role) {
+    throw new Error(`This email is registered as ${existingUser.role === "admin" ? "an admin" : "a student"}.`);
+  }
+
+  await runQuery(
+    getSupabase().from("app_user_roles").upsert(
+      {
+        email: normalizedEmail,
+        role,
+        password_hash: hashPassword(enteredPassword),
+        full_name: trimmedName || null
+      },
+      { onConflict: "email" }
+    )
+  );
+
+  return getRegisteredUsersByRole(role);
+}
+
+export async function updateRegisteredStudent(currentEmail: string, nextEmail: string, fullName = "", password = "") {
+  return updateRegisteredUser("student", currentEmail, nextEmail, fullName, password);
+}
+
+export async function updateRegisteredAdmin(currentEmail: string, nextEmail: string, fullName = "", password = "") {
+  return updateRegisteredUser("admin", currentEmail, nextEmail, fullName, password);
+}
+
+async function updateRegisteredUser(role: "admin" | "student", currentEmail: string, nextEmail: string, fullName = "", password = "") {
+  const normalizedCurrentEmail = normalizeEmail(currentEmail);
+  const normalizedNextEmail = normalizeEmail(nextEmail);
+  const trimmedName = fullName.trim();
+  const enteredPassword = password.trim();
+
+  if (!normalizedCurrentEmail || !normalizedNextEmail) {
+    throw new Error(`Enter ${role} email.`);
+  }
+
+  const existing = await runQuery(
+    getSupabase()
+      .from("app_user_roles")
+      .select("email,role,password_hash")
+      .eq("email", normalizedCurrentEmail)
+      .maybeSingle()
+  );
+  const existingUser = existing.data as AppUserRoleRow | null;
+
+  if (existingUser?.role !== role) {
+    throw new Error(`${role === "admin" ? "Admin" : "Student"} was not found.`);
+  }
+
+  if (normalizedCurrentEmail !== normalizedNextEmail) {
+    const conflicting = await runQuery(
+      getSupabase().from("app_user_roles").select("email").eq("email", normalizedNextEmail).maybeSingle()
+    );
+
+    if (conflicting.data) {
+      throw new Error("Another user already uses this email.");
+    }
+  }
+
+  const passwordHash = enteredPassword ? hashPassword(enteredPassword) : existingUser.password_hash;
+
+  if (!passwordHash) {
+    throw new Error(`Enter a new password for this ${role}.`);
+  }
+
+  if (normalizedCurrentEmail === normalizedNextEmail) {
+    await runQuery(
+      getSupabase()
+        .from("app_user_roles")
+        .update({ full_name: trimmedName || null, password_hash: passwordHash })
+        .eq("email", normalizedCurrentEmail)
+        .eq("role", role)
+    );
+  } else {
+    await runQuery(
+      getSupabase()
+        .from("app_user_roles")
+        .insert({
+          email: normalizedNextEmail,
+          role,
+          password_hash: passwordHash,
+          full_name: trimmedName || null
+        })
+    );
+    if (role === "student") {
+      await Promise.all([
+        runOptionalQuery(getSupabase().from("admin_unit_access").update({ email: normalizedNextEmail }).eq("email", normalizedCurrentEmail)),
+        runOptionalQuery(getSupabase().from("admin_pdf_access").update({ email: normalizedNextEmail }).eq("email", normalizedCurrentEmail))
+      ]);
+    }
+    await runQuery(getSupabase().from("app_user_roles").delete().eq("email", normalizedCurrentEmail).eq("role", role));
+  }
+
+  return getRegisteredUsersByRole(role);
+}
+
+export async function removeRegisteredStudent(email: string) {
+  return removeRegisteredUser("student", email);
+}
+
+export async function removeRegisteredAdmin(email: string) {
+  return removeRegisteredUser("admin", email);
+}
+
+async function removeRegisteredUser(role: "admin" | "student", email: string) {
+  const normalizedEmail = normalizeEmail(email);
+
+  if (!normalizedEmail) {
+    throw new Error(`Enter ${role} email.`);
+  }
+
+  if (role === "student") {
+    await Promise.all([
+      runOptionalQuery(getSupabase().from("admin_unit_access").delete().eq("email", normalizedEmail)),
+      runOptionalQuery(getSupabase().from("admin_pdf_access").delete().eq("email", normalizedEmail))
+    ]);
+  }
+  await runQuery(getSupabase().from("app_user_roles").delete().eq("email", normalizedEmail).eq("role", role));
+
+  return getRegisteredUsersByRole(role);
 }
 
 export async function getPdfResources() {
@@ -409,6 +615,34 @@ export async function removeTopicSubtopic(subjectId: string, unitId: string, top
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
+}
+
+function verifyPassword(password: string, storedHash: string) {
+  const [algorithm, salt, hash] = storedHash.split(":");
+
+  if (algorithm !== "scrypt" || !salt || !hash) {
+    return false;
+  }
+
+  const storedBuffer = Buffer.from(hash, "hex");
+  const enteredBuffer = scryptSync(password, salt, storedBuffer.length);
+
+  return storedBuffer.length === enteredBuffer.length && timingSafeEqual(storedBuffer, enteredBuffer);
+}
+
+function hashPassword(password: string) {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, 64).toString("hex");
+
+  return `scrypt:${salt}:${hash}`;
+}
+
+function buildRegisteredStudent(row: AppUserRoleRow): RegisteredStudent {
+  return {
+    email: row.email,
+    fullName: row.full_name ?? null,
+    createdAt: row.created_at ?? ""
+  };
 }
 
 function slugify(value: string) {

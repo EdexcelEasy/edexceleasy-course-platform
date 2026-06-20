@@ -51,6 +51,7 @@ export default function Home() {
   const [selectedPdfId, setSelectedPdfId] = useState("");
   const [query, setQuery] = useState("");
   const [studentEmail, setStudentEmail] = useState("");
+  const [studentName, setStudentName] = useState("");
   const [isLoadingAccess, setIsLoadingAccess] = useState(true);
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
   const [fullscreenElementId, setFullscreenElementId] = useState("");
@@ -65,6 +66,7 @@ export default function Home() {
       window.localStorage.getItem("edexcel-auth-email") ?? "",
     );
     setStudentEmail(loggedEmail);
+    setStudentName(window.localStorage.getItem("edexcel-auth-name") ?? "");
 
     void loadStudentAccess(loggedEmail);
   }, [router]);
@@ -187,6 +189,7 @@ export default function Home() {
   function handleLogout() {
     window.localStorage.removeItem("edexcel-auth-role");
     window.localStorage.removeItem("edexcel-auth-email");
+    window.localStorage.removeItem("edexcel-auth-name");
     router.push("/");
   }
 
@@ -238,7 +241,8 @@ export default function Home() {
 
         <div className="student-account">
           <span>Signed in as</span>
-          <strong>{studentEmail || "Student"}</strong>
+          <strong>{studentName || studentEmail || "Student"}</strong>
+          {studentName && studentEmail && <small>{studentEmail}</small>}
         </div>
 
         <div className="category-dropdown">
@@ -353,8 +357,8 @@ export default function Home() {
       <section className="lesson-column">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Learning library</p>
-            <h1>Edexcel Easy Recorded Course</h1>
+            <p className="eyebrow">Edexcel Easy Recorded Course</p>
+            <h1>Welcome {studentName || studentEmail || "Student"}</h1>
           </div>
           <div className="topbar-tools">
             <div className="search-row top-search">
