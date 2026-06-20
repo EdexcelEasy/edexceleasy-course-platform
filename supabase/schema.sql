@@ -17,6 +17,11 @@ create table if not exists public.admin_subject_topics (
 
 drop table if exists public.admin_subject_access;
 
+create table if not exists public.admin_deleted_seed_subjects (
+  subject_id text primary key,
+  deleted_at timestamptz not null default now()
+);
+
 create table if not exists public.admin_units (
   id text primary key,
   subject_id text not null references public.admin_subjects(id) on delete cascade,
@@ -134,6 +139,7 @@ for each row execute function public.set_updated_at();
 
 alter table public.admin_subjects enable row level security;
 alter table public.admin_subject_topics enable row level security;
+alter table public.admin_deleted_seed_subjects enable row level security;
 alter table public.admin_units enable row level security;
 alter table public.admin_unit_access enable row level security;
 alter table public.admin_topics enable row level security;

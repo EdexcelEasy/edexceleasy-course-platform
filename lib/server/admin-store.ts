@@ -23,6 +23,10 @@ type SubjectTopicRow = {
   display_order: number;
 };
 
+type DeletedSeedSubjectRow = {
+  subject_id: string;
+};
+
 type UnitRow = {
   id: string;
   subject_id: string;
@@ -132,6 +136,16 @@ export async function addPdfSubject(name: string) {
   return getPdfSubjects();
 }
 
+export async function updatePdfSubject(subjectId: string, name: string) {
+  const trimmedName = name.trim();
+
+  if (!trimmedName) return getPdfSubjects();
+
+  await runQuery(getSupabase().from("admin_pdf_subjects").update({ name: trimmedName }).eq("id", subjectId));
+
+  return getPdfSubjects();
+}
+
 export async function addPdfResource(title: string, driveUrl: string, pdfSubjectId: string) {
   const trimmedTitle = title.trim();
   const trimmedDriveUrl = driveUrl.trim();
@@ -195,6 +209,8 @@ export async function addSubject(name: string) {
   const existingSubjects = await getAdminSubjects();
   if (existingSubjects.some((subject) => subject.id === id)) return existingSubjects;
 
+  await runOptionalQuery(getSupabase().from("admin_deleted_seed_subjects").delete().eq("subject_id", id));
+
   await runQuery(
     getSupabase().from("admin_subjects").insert({
       id,
@@ -208,7 +224,23 @@ export async function addSubject(name: string) {
 }
 
 export async function removeSubject(subjectId: string) {
+  if (subjectsSeed.some((subject) => subject.id === subjectId)) {
+    await runOptionalQuery(
+      getSupabase().from("admin_deleted_seed_subjects").upsert({ subject_id: subjectId }, { onConflict: "subject_id" })
+    );
+  }
+
   await runQuery(getSupabase().from("admin_subjects").delete().eq("id", subjectId));
+
+  return getAdminSubjects();
+}
+
+export async function updateSubject(subjectId: string, name: string) {
+  const trimmedName = name.trim();
+
+  if (!trimmedName) return getAdminSubjects();
+
+  await runQuery(getSupabase().from("admin_subjects").update({ name: trimmedName }).eq("id", subjectId));
 
   return getAdminSubjects();
 }
@@ -393,14 +425,22 @@ function pickSubjectColor(index: number) {
 }
 
 async function ensureSeedData() {
-  const subjectRows = subjectsSeed.map((subject, subjectIndex) => ({
+  const deletedSeedSubjects = await runOptionalQuery(
+    getSupabase().from("admin_deleted_seed_subjects").select("subject_id")
+  );
+  const deletedSeedSubjectIds = new Set(
+    ((deletedSeedSubjects.data ?? []) as DeletedSeedSubjectRow[]).map((subject) => subject.subject_id)
+  );
+  const activeSeedSubjects = subjectsSeed.filter((subject) => !deletedSeedSubjectIds.has(subject.id));
+
+  const subjectRows = activeSeedSubjects.map((subject, subjectIndex) => ({
     id: subject.id,
     name: subject.name,
     color: subject.color,
     display_order: subjectIndex
   }));
 
-  const subjectTopicRows = subjectsSeed.flatMap((subject) =>
+  const subjectTopicRows = activeSeedSubjects.flatMap((subject) =>
     subject.topics.map((topic, topicIndex) => ({
       subject_id: subject.id,
       title: topic,
@@ -408,7 +448,7 @@ async function ensureSeedData() {
     }))
   );
 
-  const unitRows = subjectsSeed.flatMap((subject) =>
+  const unitRows = activeSeedSubjects.flatMap((subject) =>
     (subject.units ?? []).map((unit, unitIndex) => ({
       id: unit.id,
       subject_id: subject.id,
@@ -418,7 +458,7 @@ async function ensureSeedData() {
     }))
   );
 
-  const topicRows = subjectsSeed.flatMap((subject) =>
+  const topicRows = activeSeedSubjects.flatMap((subject) =>
     (subject.units ?? []).flatMap((unit) =>
       getUnitTopicItems(unit).map((topic, topicIndex) => ({
         id: topic.id,
@@ -429,11 +469,10 @@ async function ensureSeedData() {
     )
   );
 
-  await runQuery(
-    getSupabase().from("admin_subjects").upsert(subjectRows, { onConflict: "id", ignoreDuplicates: true })
-  );
-
   await Promise.all([
+    subjectRows.length
+      ? runQuery(getSupabase().from("admin_subjects").upsert(subjectRows, { onConflict: "id", ignoreDuplicates: true }))
+      : Promise.resolve(null),
     subjectTopicRows.length
       ? runQuery(
           getSupabase()

@@ -3,6 +3,21 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      admin_deleted_seed_subjects: {
+        Row: {
+          subject_id: string;
+          deleted_at: string;
+        };
+        Insert: {
+          subject_id: string;
+          deleted_at?: string;
+        };
+        Update: {
+          subject_id?: string;
+          deleted_at?: string;
+        };
+        Relationships: [];
+      };
       admin_subjects: {
         Row: {
           id: string;

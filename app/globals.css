@@ -1158,7 +1158,7 @@ h2 {
   gap: 10px;
   grid-template-columns: 18px 1fr auto;
   min-height: 46px;
-  padding: 10px 12px;
+  padding: 10px;
   text-align: left;
 }
 
@@ -1166,13 +1166,38 @@ h2 {
   align-items: center;
   display: grid;
   gap: 6px;
-  grid-template-columns: minmax(0, 1fr) 34px;
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .admin-subject-row .admin-subject-button {
   min-width: 0;
 }
 
+.admin-subject-actions {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.admin-subject-edit-form {
+  align-items: center;
+  display: grid;
+  gap: 6px;
+  grid-column: 1 / -1;
+  grid-template-columns: 18px minmax(0, 1fr) 34px 34px;
+}
+
+.admin-subject-edit-form input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  color: #ffffff;
+  min-height: 38px;
+  min-width: 0;
+  padding: 8px 10px;
+}
+
+.admin-subject-edit-form button,
+.admin-subject-edit,
 .admin-subject-delete {
   align-items: center;
   background: transparent;
@@ -1185,12 +1210,32 @@ h2 {
   width: 34px;
 }
 
+.admin-subject-edit {
+  background: rgba(37, 99, 235, 0.16);
+  border-color: rgba(96, 165, 250, 0.28);
+  color: #bfdbfe;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 4px;
+  padding: 0 8px;
+  width: auto;
+}
+
+.admin-subject-edit-form button:hover:not(:disabled),
+.admin-subject-edit:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.16);
+  border-color: rgba(96, 165, 250, 0.32);
+  color: #bfdbfe;
+}
+
 .admin-subject-delete:hover:not(:disabled) {
   background: rgba(239, 68, 68, 0.14);
   border-color: rgba(239, 68, 68, 0.32);
   color: #fecaca;
 }
 
+.admin-subject-edit-form button:disabled,
+.admin-subject-edit:disabled,
 .admin-subject-delete:disabled {
   cursor: not-allowed;
   opacity: 0.5;

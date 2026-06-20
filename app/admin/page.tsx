@@ -33,7 +33,15 @@ export default function AdminPage() {
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [selectedPdfSubjectId, setSelectedPdfSubjectId] = useState("");
   const [subjectName, setSubjectName] = useState("");
+  const [editingSubjectId, setEditingSubjectId] = useState("");
+  const [subjectEditDrafts, setSubjectEditDrafts] = useState<
+    Record<string, string>
+  >({});
   const [pdfSubjectName, setPdfSubjectName] = useState("");
+  const [editingPdfSubjectId, setEditingPdfSubjectId] = useState("");
+  const [pdfSubjectEditDrafts, setPdfSubjectEditDrafts] = useState<
+    Record<string, string>
+  >({});
   const [pdfDraft, setPdfDraft] = useState({
     title: "",
     driveUrl: "",
@@ -250,6 +258,28 @@ export default function AdminPage() {
     });
     const data = await readPdfsResponse(response);
     setPdfs(data.pdfs);
+    setIsSaving(false);
+  }
+
+  async function handleUpdatePdfSubject(
+    event: FormEvent<HTMLFormElement>,
+    subjectId: string,
+  ) {
+    event.preventDefault();
+    const name = pdfSubjectEditDrafts[subjectId]?.trim();
+    if (!name) return;
+
+    setIsSaving(true);
+    const response = await fetch(`/api/admin/pdf-subjects/${subjectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const data = await readPdfSubjectsResponse(response);
+    setPdfSubjects(data.pdfSubjects);
+    setSelectedPdfSubjectId(subjectId);
+    setEditingPdfSubjectId("");
+    setPdfSubjectEditDrafts((current) => ({ ...current, [subjectId]: "" }));
     setIsSaving(false);
   }
 
@@ -485,6 +515,26 @@ export default function AdminPage() {
     setIsSaving(false);
   }
 
+  async function handleUpdateSubject(
+    event: FormEvent<HTMLFormElement>,
+    subjectId: string,
+  ) {
+    event.preventDefault();
+    const name = subjectEditDrafts[subjectId]?.trim();
+    if (!name) return;
+
+    setIsSaving(true);
+    const response = await fetch(`/api/admin/subjects/${subjectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    applySubjects(await readSubjectsResponse(response), subjectId);
+    setEditingSubjectId("");
+    setSubjectEditDrafts((current) => ({ ...current, [subjectId]: "" }));
+    setIsSaving(false);
+  }
+
   function handleLogout() {
     window.localStorage.removeItem("edexcel-auth-role");
     window.localStorage.removeItem("edexcel-auth-email");
@@ -552,32 +602,90 @@ export default function AdminPage() {
             <div className="admin-subject-list">
               {subjects.map((subject) => (
                 <div className="admin-subject-row" key={subject.id}>
-                  <button
-                    className={
-                      selectedSubject?.id === subject.id
-                        ? "admin-subject-button active"
-                        : "admin-subject-button"
-                    }
-                    onClick={() => setSelectedSubjectId(subject.id)}
-                    type="button"
-                  >
-                    <span
-                      className="subject-dot"
-                      style={{ background: subject.color }}
-                    />
-                    <span>{subject.name}</span>
-                  </button>
-                  <button
-                    className="admin-subject-delete"
-                    disabled={isSaving}
-                    onClick={() =>
-                      void handleDeleteSubject(subject.id, subject.name)
-                    }
-                    title={`Delete ${subject.name}`}
-                    type="button"
-                  >
-                    <Trash2 size={15} aria-hidden="true" />
-                  </button>
+                  {editingSubjectId === subject.id ? (
+                    <form
+                      className="admin-subject-edit-form"
+                      onSubmit={(event) =>
+                        void handleUpdateSubject(event, subject.id)
+                      }
+                    >
+                      <span
+                        className="subject-dot"
+                        style={{ background: subject.color }}
+                      />
+                      <input
+                        autoFocus
+                        value={subjectEditDrafts[subject.id] ?? subject.name}
+                        onChange={(event) =>
+                          setSubjectEditDrafts((current) => ({
+                            ...current,
+                            [subject.id]: event.target.value,
+                          }))
+                        }
+                      />
+                      <button
+                        disabled={isSaving}
+                        title={`Save ${subject.name}`}
+                        type="submit"
+                      >
+                        <Check size={15} aria-hidden="true" />
+                      </button>
+                      <button
+                        disabled={isSaving}
+                        onClick={() => setEditingSubjectId("")}
+                        title="Cancel edit"
+                        type="button"
+                      >
+                        <X size={15} aria-hidden="true" />
+                      </button>
+                    </form>
+                  ) : (
+                    <>
+                      <button
+                        className={
+                          selectedSubject?.id === subject.id
+                            ? "admin-subject-button active"
+                            : "admin-subject-button"
+                        }
+                        onClick={() => setSelectedSubjectId(subject.id)}
+                        type="button"
+                      >
+                        <span
+                          className="subject-dot"
+                          style={{ background: subject.color }}
+                        />
+                        <span>{subject.name}</span>
+                      </button>
+                      <div className="admin-subject-actions">
+                        <button
+                          className="admin-subject-edit"
+                          disabled={isSaving}
+                          onClick={() => {
+                            setEditingSubjectId(subject.id);
+                            setSubjectEditDrafts((current) => ({
+                              ...current,
+                              [subject.id]: subject.name,
+                            }));
+                          }}
+                          title={`Edit ${subject.name}`}
+                          type="button"
+                        >
+                          <Pencil size={15} aria-hidden="true" />
+                        </button>
+                        <button
+                          className="admin-subject-delete"
+                          disabled={isSaving}
+                          onClick={() =>
+                            void handleDeleteSubject(subject.id, subject.name)
+                          }
+                          title={`Delete ${subject.name}`}
+                          type="button"
+                        >
+                          <Trash2 size={15} aria-hidden="true" />
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
@@ -608,24 +716,80 @@ export default function AdminPage() {
             <div className="admin-subject-list">
               {pdfSubjects.map((subject) => (
                 <div className="admin-subject-row" key={subject.id}>
-                  <button
-                    className={
-                      selectedPdfSubject?.id === subject.id
-                        ? "admin-subject-button active"
-                        : "admin-subject-button"
-                    }
-                    onClick={() => {
-                      setSelectedPdfSubjectId(subject.id);
-                      setPdfDraft((current) => ({
-                        ...current,
-                        pdfSubjectId: subject.id,
-                      }));
-                    }}
-                    type="button"
-                  >
-                    <span className="subject-dot pdf-dot" />
-                    <span>{subject.name}</span>
-                  </button>
+                  {editingPdfSubjectId === subject.id ? (
+                    <form
+                      className="admin-subject-edit-form"
+                      onSubmit={(event) =>
+                        void handleUpdatePdfSubject(event, subject.id)
+                      }
+                    >
+                      <span className="subject-dot pdf-dot" />
+                      <input
+                        autoFocus
+                        value={pdfSubjectEditDrafts[subject.id] ?? subject.name}
+                        onChange={(event) =>
+                          setPdfSubjectEditDrafts((current) => ({
+                            ...current,
+                            [subject.id]: event.target.value,
+                          }))
+                        }
+                      />
+                      <button
+                        disabled={isSaving}
+                        title={`Save ${subject.name}`}
+                        type="submit"
+                      >
+                        <Check size={15} aria-hidden="true" />
+                      </button>
+                      <button
+                        disabled={isSaving}
+                        onClick={() => setEditingPdfSubjectId("")}
+                        title="Cancel edit"
+                        type="button"
+                      >
+                        <X size={15} aria-hidden="true" />
+                      </button>
+                    </form>
+                  ) : (
+                    <>
+                      <button
+                        className={
+                          selectedPdfSubject?.id === subject.id
+                            ? "admin-subject-button active"
+                            : "admin-subject-button"
+                        }
+                        onClick={() => {
+                          setSelectedPdfSubjectId(subject.id);
+                          setPdfDraft((current) => ({
+                            ...current,
+                            pdfSubjectId: subject.id,
+                          }));
+                        }}
+                        type="button"
+                      >
+                        <span className="subject-dot pdf-dot" />
+                        <span>{subject.name}</span>
+                      </button>
+                      <div className="admin-subject-actions">
+                        <button
+                          className="admin-subject-edit"
+                          disabled={isSaving}
+                          onClick={() => {
+                            setEditingPdfSubjectId(subject.id);
+                            setPdfSubjectEditDrafts((current) => ({
+                              ...current,
+                              [subject.id]: subject.name,
+                            }));
+                          }}
+                          title={`Edit ${subject.name}`}
+                          type="button"
+                        >
+                          <Pencil size={15} aria-hidden="true" />
+                          <span>Edit</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { removeSubject, updateSubject } from "@/lib/server/admin-store";
+import { updatePdfSubject } from "@/lib/server/admin-store";
 
 type RouteContext = {
   params: Promise<{
@@ -7,24 +7,13 @@ type RouteContext = {
   }>;
 };
 
-export async function DELETE(request: Request, context: RouteContext) {
-  try {
-    const { subjectId } = await context.params;
-    const subjects = await removeSubject(subjectId);
-
-    return NextResponse.json({ subjects });
-  } catch (error) {
-    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
-  }
-}
-
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { subjectId } = await context.params;
     const body = (await request.json()) as { name?: string };
-    const subjects = await updateSubject(subjectId, body.name ?? "");
+    const pdfSubjects = await updatePdfSubject(subjectId, body.name ?? "");
 
-    return NextResponse.json({ subjects });
+    return NextResponse.json({ pdfSubjects });
   } catch (error) {
     return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }
